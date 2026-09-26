@@ -455,8 +455,15 @@ def _grade(key: str, a: dict[str, Any]) -> tuple[int | None, str, list[tuple[str
     return g, f"Severity {a.get('severity', 'not reported')}, {ADL_TEXT.get(adl, 'impact not reported')}", flags
 
 
-def evaluate(selected: list[str], answers: dict[str, Any], safety: dict[str, Any]) -> dict[str, Any]:
-    """Validate answers and build the clinician-facing summary. Raises CheckinError on invalid input."""
+def _heard(voice: dict[str, Any] | None, prefix: str, qid: str) -> str | None:
+    value = ((voice or {}).get(prefix) or {}).get(qid)
+    return str(value).strip()[:300] or None if value else None
+
+
+def evaluate(selected: list[str], answers: dict[str, Any], safety: dict[str, Any], voice: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Validate answers and build the clinician-facing summary. Raises CheckinError on invalid input.
+
+    `voice` holds what the patient said for each spoken answer ({symptom or "safety": {question id: transcript}})."""
     items, flags = [], []
     for key in selected:
         questions = questions_for(key)
@@ -467,8 +474,10 @@ def evaluate(selected: list[str], answers: dict[str, Any], safety: dict[str, Any
         items.append({
             "key": key, "term": term, "label": spec["label"]["en"] if spec else key.replace("_", " ").capitalize(),
             "onset": clean.get("onset"),
-            "answers": [{"id": q["id"], "question": q["text"]["en"], "answer": _label(q, clean[q["id"]]), "value": clean[q["id"]]}
+            "answers": [{"id": q["id"], "question": q["text"]["en"], "answer": _label(q, clean[q["id"]]), "value": clean[q["id"]],
+                         "heard": _heard(voice, key, q["id"])}
                         for q in questions if q["id"] in clean and q["id"] != "onset"],
+            "onset_heard": _heard(voice, key, "onset"),
             "pro": {k: clean.get(k) for k in ("frequency", "severity", "interference") if clean.get(k)},
             "grade_suggestion": grade if term else None, "rationale": rationale,
         })
@@ -478,7 +487,8 @@ def evaluate(selected: list[str], answers: dict[str, Any], safety: dict[str, Any
     for q in SAFETY_QUESTIONS:
         if q["id"] in safety_clean:
             value = safety_clean[q["id"]]
-            safety_out.append({"id": q["id"], "question": q["text"]["en"], "answer": _label(q, value), "value": value})
+            safety_out.append({"id": q["id"], "question": q["text"]["en"], "answer": _label(q, value), "value": value,
+                               "heard": _heard(voice, "safety", q["id"])})
             trigger, code, label = q["flag"]
             if value == trigger:
                 flags.append((code, label))
@@ -491,7 +501,8 @@ def evaluate(selected: list[str], answers: dict[str, Any], safety: dict[str, Any
     impact = "selfcare" if "selfcare" in adl_levels else "some" if "instrumental" in adl_levels else "none" if adl_levels else None
     temps = [a["value"] for i in items for a in i["answers"] if a["id"] == "max_temp"]
     onsets = [i["onset"] for i in items if i["onset"]]
-    return {"items": items, "safety": safety_out, "red_flags": red_flags, "daily_impact": impact,
+    by_voice = any(a.get("heard") for i in items for a in i["answers"]) or any(a.get("heard") for a in safety_out)
+    return {"items": items, "safety": safety_out, "red_flags": red_flags, "daily_impact": impact, "by_voice": by_voice,
             "temperature": max(temps) if temps else None, "onset": min(onsets) if onsets else None}
 
 
@@ -499,7 +510,7 @@ def summary_text(checkin: dict[str, Any]) -> str:
     """Plain-English summary used in AI prompts and in the clinician's CTCAE note."""
     parts = []
     for item in checkin.get("items", []):
-        answers = "; ".join(f"{a['question']} {a['answer']}" for a in item["answers"])
+        answers = "; ".join(f"{a['question']} {a['answer']}" + (f" (patient said: \"{a['heard']}\")" if a.get("heard") else "") for a in item["answers"])
         parts.append(f"{item['label']}" + (f" (since {item['onset']})" if item.get("onset") else "") + (f": {answers}" if answers else ""))
     if checkin.get("safety"):
         parts.append("Safety: " + "; ".join(f"{a['question']} {a['answer']}" for a in checkin["safety"]))

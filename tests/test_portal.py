@@ -177,6 +177,9 @@ class PortalTestCase(unittest.TestCase):
         self.assertEqual(len(bank["data"]["safety"]), 5)
         _, found, _ = self.call(patient, "POST", "/api/portal/checkin/detect", {"text": "నాకు వాంతులు ఎక్కువ అవుతున్నాయి, tired all day"})
         self.assertEqual(set(found["data"]["symptoms"]), {"vomiting", "tiredness"})
+        status, heard, _ = self.call(patient, "POST", "/api/portal/checkin/interpret", {"symptom": "vomiting", "question": "episodes", "heard": "तीन बार", "lang": "hi"})
+        self.assertEqual((status, heard["data"]["value"], heard["data"]["label"]), (200, "3-5", "3–5 बार"))
+        self.assertEqual(self.call(patient, "POST", "/api/portal/checkin/interpret", {"symptom": "vomiting", "question": "nope", "heard": "x"})[0], 422)
         safe = {"fever": "no", "fluids": "yes", "urine": "yes", "bleeding": "no", "breathing": "no"}
         checkin = {"symptoms": ["vomiting", "tiredness"], "safety": safe, "answers": {
             "vomiting": {"onset": "2026-08-24", "episodes": "3-5", "fluids": "some", "treatment": "iv", "frequency": "frequently"},
@@ -301,6 +304,38 @@ class QuestionnaireTests(unittest.TestCase):
             self.assertEqual(set(question["text"]), set(q.LANGS), question["id"])
             for option in question.get("options", []):
                 self.assertTrue(all(option["label"][lang].strip() for lang in q.LANGS), option["value"])
+
+
+class VoiceAnswerTests(unittest.TestCase):
+    def test_spoken_answers_in_three_languages(self) -> None:
+        from datetime import date
+        from backend.voice_answers import interpret
+        d = date(2026, 9, 26)
+        cases = [
+            ("vomiting", "episodes", "మూడుసార్లు అయింది", "3-5"), ("vomiting", "episodes", "about 7 times", "6+"),
+            ("vomiting", "fluids", "नहीं, सब निकल जाता है", "no"), ("vomiting", "fluids", "కొంచెం నిలుస్తున్నాయి", "some"),
+            ("vomiting", "treatment", "हॉस्पिटल में भर्ती हुई", "admitted"), ("vomiting", "frequency", "కొన్నిసార్లు", "occasionally"),
+            ("vomiting", "onset", "నిన్న నుంచి", "2026-09-25"), ("vomiting", "onset", "3 दिन से", "2026-09-23"),
+            ("tiredness", "severity", "చాలా ఎక్కువ", "very_severe"), ("tiredness", "interference", "मुझे नहाने में मदद चाहिए", "selfcare"),
+            ("tiredness", "rest_helps", "లేదు తగ్గడం లేదు", "no"), ("fever", "max_temp", "101 degrees", 38.3),
+            ("safety", "fever", "नापा नहीं", "not_measured"), ("safety", "bleeding", "नहीं है", "no"), ("safety", "breathing", "ఉంది", "yes"),
+            ("diarrhoea", "extra_stools", "ఐదు సార్లు", "4-6"), ("tiredness", "severity", "the second one", "moderate"),
+        ]
+        for symptom, qid, heard, expected in cases:
+            self.assertEqual(interpret(symptom, qid, heard, "te", today=d)["value"], expected, heard)
+        self.assertIsNone(interpret("vomiting", "episodes", "blah", today=d)["value"])  # AI is off in tests
+        self.assertEqual(interpret("vomiting", "fluids", "కొంచెం", "te", today=d)["label"], "కొంత మాత్రమే")
+
+    def test_transcripts_are_kept_with_answers(self) -> None:
+        from backend import questionnaire as q
+        safe = {"fever": "no", "fluids": "yes", "urine": "yes", "bleeding": "no", "breathing": "no"}
+        result = q.evaluate(["vomiting"], {"vomiting": {"episodes": "3-5", "onset": "2026-09-01"}}, safe,
+                            {"vomiting": {"episodes": "మూడుసార్లు", "onset": "నిన్న"}, "safety": {"fever": "లేదు"}})
+        self.assertEqual(result["items"][0]["answers"][0]["heard"], "మూడుసార్లు")
+        self.assertEqual(result["items"][0]["onset_heard"], "నిన్న")
+        self.assertEqual(result["safety"][0]["heard"], "లేదు")
+        self.assertTrue(result["by_voice"])
+        self.assertIn('patient said: "మూడుసార్లు"', q.summary_text(result))
 
 
 class AnthropicRetryTests(unittest.TestCase):

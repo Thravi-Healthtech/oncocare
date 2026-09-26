@@ -1,6 +1,6 @@
 "use strict";
 
-const P = { me: null, lang: "en", bank: null, ci: null, plans: [], labs: null, reports: [], mode: "voice", recognition: null, recorder: null, chunks: [], audioBlob: null,
+const P = { me: null, lang: "en", bank: null, ci: null, rec: null, voiceQA: false, vc: { token: 0, recognition: null, utterance: null }, plans: [], labs: null, reports: [], mode: "voice", recognition: null, recorder: null, chunks: [], audioBlob: null,
   listening: false, spokenBase: "", usedVoice: false };
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -54,7 +54,8 @@ async function signIn(event) {
 async function signOut() {
   stopVoice(true);
   try { await api("/api/portal/logout", { method: "POST" }); } catch { /* ignore */ }
-  P.me = null; P.bank = null; newCheckin(); showDescribe(); $("#sentPanel").innerHTML = ""; location.hash = ""; showLogin();
+  stopConversation(); recDiscard();
+  P.me = null; P.bank = null; P.voiceQA = false; newCheckin(); showDescribe(); $("#sentPanel").innerHTML = ""; location.hash = ""; showLogin();
 }
 
 /* ---------------------------------------------------------------- load + route */
@@ -77,7 +78,7 @@ function route() {
   const tab = ["home", "plan", "reports", "symptoms"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
   $$(".view").forEach(v => v.classList.toggle("active", v.dataset.view === tab));
   $$(".tabs a").forEach(a => { a.classList.toggle("active", a.dataset.tab === tab); a.setAttribute("aria-current", a.dataset.tab === tab ? "page" : "false"); });
-  if (tab !== "symptoms") stopVoice(false);
+  if (tab !== "symptoms") { stopVoice(false); stopConversation(); }
   window.scrollTo({ top: 0 });
 }
 
@@ -155,7 +156,8 @@ function renderReports() {
 
 /* ---------------------------------------------------------------- symptom check-in */
 const STR = {
-  en: { tellTeam: "Tell your care team", feelingTitle: "How are you feeling?", myMessages: "My messages", langLabel: "Language",
+  en: { vcToggle: "Ask me the questions aloud", vcSpeaking: "Asking…", vcListening: "Listening – please answer now", vcNotSure: "Sorry, I didn't understand. Please say it again or tap an answer.", vcRepeat: "Sorry, I didn't catch that.", vcTapInstead: "Please tap your answer on the screen.", vcAnswerByVoice: "Answer by voice", vcNoVoice: "This device has no voice installed for this language, so the questions are shown but not read aloud. You can still answer by speaking. (Mac: System Settings › Accessibility › Spoken Content › System voice › Manage voices.)", vcConfirm: "Please check the symptoms we found. Tap to add or remove any, then press Next.", vcReview: "Please check your answers, then press Send.", vcAbout: "Now some questions about {s}.",
+    tellTeam: "Tell your care team", feelingTitle: "How are you feeling?", myMessages: "My messages", langLabel: "Language",
     emergencyNote: '<strong>Not for emergencies.</strong> If you have a temperature of 38 °C or more, bleeding, trouble breathing, chest pain, confusion, or you can\'t keep fluids down, call your care team now or dial <a href="tel:112">112</a>.',
     step1: "Step 1 of 5 · Describe", describeTitle: "Tell us in your own words how you feel", speak: "🎤 Speak", type: "⌨ Type", speechLang: "Speech language",
     micStart: "Tap to start speaking", micListening: "Listening… tap to stop", micMore: "Tap to add more",
@@ -175,7 +177,8 @@ const STR = {
     urgentBody: "Some of what you told us can be serious during chemotherapy. Call your care team now, or go to the nearest emergency department. Do not wait for a reply here.",
     call112: "Call 112 (emergency)", newCheckin: "Start a new check-in", checkinTag: "Check-in", noMessages: "You have not sent any messages yet.",
     reply: "Reply from your care team", urgentNoted: "Urgent symptoms noted", pickOne: "Choose at least one symptom, or go back and choose \"No new symptoms\"." },
-  hi: { tellTeam: "अपनी केयर टीम को बताएं", feelingTitle: "आप कैसा महसूस कर रहे हैं?", myMessages: "मेरे संदेश", langLabel: "भाषा",
+  hi: { vcToggle: "सवाल बोलकर पूछें", vcSpeaking: "पूछ रहे हैं…", vcListening: "सुन रहे हैं – अब जवाब दें", vcNotSure: "माफ़ कीजिए, समझ नहीं आया। फिर से बोलें या जवाब पर दबाएं।", vcRepeat: "माफ़ कीजिए, सुनाई नहीं दिया।", vcTapInstead: "कृपया स्क्रीन पर अपना जवाब दबाएं।", vcAnswerByVoice: "बोलकर जवाब दें", vcNoVoice: "इस डिवाइस पर इस भाषा की आवाज़ इंस्टॉल नहीं है, इसलिए सवाल पढ़कर नहीं सुनाए जाएंगे। आप फिर भी बोलकर जवाब दे सकते हैं।", vcConfirm: "कृपया हमें मिले लक्षण जांच लें। जोड़ने या हटाने के लिए दबाएं, फिर आगे दबाएं।", vcReview: "कृपया अपने जवाब जांच लें, फिर भेजें दबाएं।", vcAbout: "अब {s} के बारे में कुछ सवाल।",
+    tellTeam: "अपनी केयर टीम को बताएं", feelingTitle: "आप कैसा महसूस कर रहे हैं?", myMessages: "मेरे संदेश", langLabel: "भाषा",
     emergencyNote: '<strong>आपातकाल के लिए नहीं।</strong> अगर आपको 38 °C या उससे ज़्यादा बुखार, खून आना, सांस लेने में तकलीफ़, सीने में दर्द, भ्रम हो, या पानी पेट में नहीं रुक रहा, तो अभी अपनी केयर टीम को फ़ोन करें या <a href="tel:112">112</a> डायल करें।',
     step1: "चरण 1 / 5 · बताएं", describeTitle: "अपने शब्दों में बताएं कि आप कैसा महसूस कर रहे हैं", speak: "🎤 बोलें", type: "⌨ लिखें", speechLang: "बोलने की भाषा",
     micStart: "बोलना शुरू करने के लिए दबाएं", micListening: "सुन रहे हैं… रोकने के लिए दबाएं", micMore: "और जोड़ने के लिए दबाएं",
@@ -195,7 +198,8 @@ const STR = {
     urgentBody: "आपने जो बताया उसमें से कुछ बातें कीमोथेरेपी के दौरान गंभीर हो सकती हैं। अभी अपनी केयर टीम को फ़ोन करें, या नज़दीकी इमरजेंसी विभाग जाएं। यहां जवाब का इंतज़ार न करें।",
     call112: "112 पर कॉल करें (इमरजेंसी)", newCheckin: "नई जांच शुरू करें", checkinTag: "जांच", noMessages: "आपने अभी तक कोई संदेश नहीं भेजा है।",
     reply: "आपकी केयर टीम का जवाब", urgentNoted: "गंभीर लक्षण दर्ज", pickOne: "कम से कम एक लक्षण चुनें, या पीछे जाकर \"कोई नया लक्षण नहीं\" चुनें।" },
-  te: { tellTeam: "మీ వైద్య బృందానికి తెలియజేయండి", feelingTitle: "మీరు ఎలా ఉన్నారు?", myMessages: "నా సందేశాలు", langLabel: "భాష",
+  te: { vcToggle: "ప్రశ్నలు గట్టిగా చదివి అడగండి", vcSpeaking: "అడుగుతున్నాం…", vcListening: "వింటున్నాం – ఇప్పుడు జవాబు చెప్పండి", vcNotSure: "క్షమించండి, అర్థం కాలేదు. మళ్లీ చెప్పండి లేదా జవాబును నొక్కండి.", vcRepeat: "క్షమించండి, వినిపించలేదు.", vcTapInstead: "దయచేసి మీ జవాబును తెరపై నొక్కండి.", vcAnswerByVoice: "మాట్లాడి జవాబు ఇవ్వండి", vcNoVoice: "ఈ పరికరంలో ఈ భాష వాయిస్ ఇన్‌స్టాల్ కాలేదు, కాబట్టి ప్రశ్నలు చదివి వినిపించవు. అయినా మీరు మాట్లాడి జవాబు ఇవ్వవచ్చు.", vcConfirm: "మేము గుర్తించిన లక్షణాలను సరిచూడండి. జోడించడానికి లేదా తీసేయడానికి నొక్కండి, తర్వాత తరువాత నొక్కండి.", vcReview: "మీ జవాబులు సరిచూసుకుని, పంపండి నొక్కండి.", vcAbout: "ఇప్పుడు {s} గురించి కొన్ని ప్రశ్నలు.",
+    tellTeam: "మీ వైద్య బృందానికి తెలియజేయండి", feelingTitle: "మీరు ఎలా ఉన్నారు?", myMessages: "నా సందేశాలు", langLabel: "భాష",
     emergencyNote: '<strong>అత్యవసర పరిస్థితులకు కాదు.</strong> మీకు 38 °C లేదా అంతకంటే ఎక్కువ జ్వరం, రక్తస్రావం, ఊపిరి ఆడకపోవడం, ఛాతీ నొప్పి, అయోమయం ఉంటే, లేదా నీళ్లు కడుపులో నిలవకపోతే, వెంటనే మీ వైద్య బృందానికి ఫోన్ చేయండి లేదా <a href="tel:112">112</a> కు కాల్ చేయండి.',
     step1: "దశ 1 / 5 · వివరించండి", describeTitle: "మీరు ఎలా ఉన్నారో మీ మాటల్లో చెప్పండి", speak: "🎤 మాట్లాడండి", type: "⌨ టైప్ చేయండి", speechLang: "మాట్లాడే భాష",
     micStart: "మాట్లాడటం మొదలుపెట్టడానికి నొక్కండి", micListening: "వింటున్నాం… ఆపడానికి నొక్కండి", micMore: "ఇంకా చెప్పడానికి నొక్కండి",
@@ -220,7 +224,7 @@ const SPEECH_FOR = { en: "en-IN", hi: "hi-IN", te: "te-IN" };
 function lang() { return P.lang || "en"; }
 function t(key, vars = {}) { return (STR[lang()][key] ?? STR.en[key] ?? key).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? ""); }
 function L(obj) { return obj ? (obj[lang()] || obj.en) : ""; }
-function newCheckin() { P.ci = { step: "describe", selected: [], detected: [], answers: {}, safety: {}, idx: 0, fromList: false, none: false }; }
+function newCheckin() { P.ci = { step: "describe", selected: [], detected: [], answers: {}, safety: {}, voice: {}, idx: 0, fromList: false, none: false }; }
 function symptomSpec(key) {
   const s = P.bank?.symptoms.find(x => x.key === key);
   return s || { key, label: { en: STR.en.otherSymptom, hi: STR.hi.otherSymptom, te: STR.te.otherSymptom }, questions: P.bank?.generic_questions || [] };
@@ -246,31 +250,56 @@ function setMode(mode) {
   $("#textLabel").textContent = mode === "voice" ? t("textVoice") : t("textType");
   if (mode !== "voice") stopVoice(false);
 }
+/* ---- one recording per check-in: resumed while the patient speaks, paused otherwise */
+async function recResume() {
+  if (!$("#attachAudio").checked || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return false;
+  if (P.rec?.recorder.state === "recording") return true;
+  if (P.rec?.recorder.state === "paused") { P.rec.recorder.resume(); return true; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find(x => MediaRecorder.isTypeSupported?.(x)) || "";
+    const recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+    P.rec = { stream, recorder, chunks: [] };
+    recorder.ondataavailable = e => { if (e.data.size) P.rec?.chunks.push(e.data); };
+    recorder.start(1000);
+    return true;
+  } catch {
+    toast("Microphone permission was not given. You can still type or tap your answers.");
+    return false;
+  }
+}
+function recBlob() { return P.rec?.chunks.length ? new Blob(P.rec.chunks, { type: P.rec.recorder.mimeType || "audio/webm" }) : null; }
+function recPause() {
+  if (P.rec?.recorder.state !== "recording") return;
+  try { P.rec.recorder.requestData(); P.rec.recorder.pause(); } catch { /* noop */ }
+  setTimeout(() => {
+    const blob = recBlob();
+    if (blob) { $("#audioPreview").src = URL.createObjectURL(blob); $("#audioPreview").hidden = false; }
+  }, 250);
+}
+function recFinish() {
+  return new Promise(resolve => {
+    if (!P.rec) return resolve(null);
+    const { recorder, stream } = P.rec;
+    const done = () => { stream.getTracks().forEach(x => x.stop()); const blob = recBlob(); P.rec = null; resolve(blob); };
+    if (recorder.state === "inactive") return done();
+    recorder.onstop = done;
+    try { recorder.stop(); } catch { done(); }
+  });
+}
+function recDiscard() {
+  if (!P.rec) return;
+  try { P.rec.recorder.state !== "inactive" && P.rec.recorder.stop(); } catch { /* noop */ }
+  P.rec.stream.getTracks().forEach(x => x.stop());
+  P.rec = null; $("#audioPreview").hidden = true;
+}
+
 async function toggleVoice() { if (P.listening) stopVoice(false); else await startVoice(); }
 async function startVoice() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const wantAudio = $("#attachAudio").checked;
   if (!SR && !(wantAudio && navigator.mediaDevices?.getUserMedia)) { toast("Voice isn't available in this browser. Please type instead."); setMode("text"); return; }
-  P.audioBlob = null; $("#audioPreview").hidden = true;
-  if (wantAudio && navigator.mediaDevices?.getUserMedia && window.MediaRecorder) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find(t => MediaRecorder.isTypeSupported?.(t)) || "";
-      P.recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
-      P.chunks = [];
-      P.recorder.ondataavailable = e => { if (e.data.size) P.chunks.push(e.data); };
-      P.recorder.onstop = () => {
-        stream.getTracks().forEach(t => t.stop());
-        P.audioBlob = new Blob(P.chunks, { type: P.recorder.mimeType || "audio/webm" });
-        const url = URL.createObjectURL(P.audioBlob);
-        $("#audioPreview").src = url; $("#audioPreview").hidden = false;
-      };
-      P.recorder.start();
-    } catch {
-      toast("Microphone permission was not given. You can still type your message.");
-      if (!SR) { setMode("text"); return; }
-    }
-  }
+  await recResume();
   if (SR) {
     const rec = new SR();
     rec.lang = $("#speechLang").value;
@@ -298,15 +327,154 @@ async function startVoice() {
   $("#micLabel").textContent = t("micListening");
 }
 function stopVoice(discard) {
-  if (!P.listening && !P.recorder) return;
+  if (discard) recDiscard(); else recPause();
+  if (!P.listening) return;
   P.listening = false;
   try { P.recognition?.stop(); } catch { /* noop */ }
   P.recognition = null;
-  if (P.recorder && P.recorder.state !== "inactive") P.recorder.stop();
-  if (discard) { P.audioBlob = null; $("#audioPreview").hidden = true; }
-  P.recorder = null;
   $("#micButton").classList.remove("recording"); $("#micButton").setAttribute("aria-pressed", "false");
   $("#micLabel").textContent = P.usedVoice ? t("micMore") : t("micStart");
+}
+
+/* ---- spoken follow-up questions: the app asks aloud in the patient's language and listens for the answer */
+const SR_CLASS = () => window.SpeechRecognition || window.webkitSpeechRecognition;
+function voices() { try { return window.speechSynthesis?.getVoices() || []; } catch { return []; } }
+function voiceFor(code) {
+  const tag = SPEECH_FOR[code] || "en-IN", base = tag.slice(0, 2);
+  const all = voices();
+  return all.find(v => v.lang === tag) || all.find(v => v.lang?.replace("_", "-").startsWith(base + "-")) || all.find(v => v.lang?.startsWith(base)) || null;
+}
+function canSpeak() { return !!window.speechSynthesis && !!voiceFor(lang()); }
+function speak(text) {
+  return new Promise(resolve => {
+    const synth = window.speechSynthesis, voice = voiceFor(lang());
+    if (!synth || !voice || !text) return resolve(false);
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.voice = voice; u.lang = voice.lang; u.rate = lang() === "en" ? 0.95 : 0.9;
+    let finished = false;
+    const end = ok => { if (!finished) { finished = true; clearTimeout(timer); resolve(ok); } };
+    const timer = setTimeout(() => end(true), 2500 + text.length * 110);  // onend is unreliable in some browsers
+    u.onend = () => end(true); u.onerror = () => end(false);
+    P.vc.utterance = u;  // keep a reference (Chrome can garbage-collect it mid-speech)
+    synth.speak(u);
+  });
+}
+function listenOnce(onInterim) {
+  return new Promise(resolve => {
+    const SR = SR_CLASS();
+    if (!SR) return resolve(null);
+    const rec = new SR();
+    rec.lang = SPEECH_FOR[lang()] || "en-IN"; rec.continuous = false; rec.interimResults = true; rec.maxAlternatives = 1;
+    let best = "", settled = false;
+    const finish = () => { if (!settled) { settled = true; clearTimeout(timer); recPause(); resolve(best.trim() || null); } };
+    const timer = setTimeout(() => { try { rec.stop(); } catch { finish(); } }, 12000);
+    rec.onresult = e => {
+      let text = "";
+      for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+      best = text; onInterim?.(text);
+      if (e.results[e.results.length - 1].isFinal) { try { rec.stop(); } catch { finish(); } }
+    };
+    rec.onerror = e => { if (e.error === "not-allowed") { toast("Microphone permission was not given."); P.voiceQA = false; } finish(); };
+    rec.onend = finish;
+    P.vc.recognition = rec;
+    recResume().then(() => { try { rec.start(); } catch { finish(); } });
+  });
+}
+function stopConversation() {
+  P.vc.token += 1;
+  try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
+  try { P.vc.recognition?.abort(); } catch { /* noop */ }
+  P.vc.recognition = null;
+  recPause();
+  $$("#wizard .q.asking").forEach(el => el.classList.remove("asking"));
+  setVcStatus("");
+}
+function setVcStatus(state, text = "") {
+  const bar = $("#wizard .vc-status");
+  if (!bar) return;
+  bar.dataset.state = state;
+  bar.textContent = state === "speaking" ? `🔊 ${t("vcSpeaking")}` : state === "listening" ? `🎤 ${t("vcListening")}` : state === "thinking" ? `… ${t("checking")}` : text;
+}
+function questionSpeech(q) {
+  const or = { en: "or", hi: "या", te: "లేదా" }[lang()];
+  if (q.type !== "choice") return L(q.text);
+  const labels = q.options.map(o => L(o.label));
+  return `${L(q.text)} ${labels.slice(0, -1).join(", ")} ${or} ${labels.at(-1)}.`;
+}
+function markHeard(qEl, heard, label, ok) {
+  const box = qEl?.querySelector(".vc-heard");
+  if (!box) return;
+  box.hidden = !heard && !label;
+  box.className = `vc-heard ${ok === false ? "unclear" : ""}`;
+  box.innerHTML = `${heard ? `<span>🎤 “${esc(heard)}”</span>` : ""}${label ? `<strong>→ ${esc(label)}</strong>` : ok === false ? `<strong>${esc(t("vcNotSure"))}</strong>` : ""}`;
+}
+async function askByVoice(questions, prefix, store, token) {
+  const voiceStore = P.ci.voice[prefix] || (P.ci.voice[prefix] = {});
+  for (const q of questions) {
+    if (token !== P.vc.token) return false;
+    if (store[q.id] !== undefined && store[q.id] !== "") continue;
+    const qEl = $(`#wizard .q[data-q="${CSS.escape(q.id)}"]`);
+    $$("#wizard .q.asking").forEach(el => el.classList.remove("asking"));
+    qEl?.classList.add("asking");
+    qEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+    let answered = false;
+    for (let attempt = 0; attempt < 2 && !answered; attempt++) {
+      setVcStatus("speaking");
+      await speak(attempt === 0 ? questionSpeech(q) : `${t("vcRepeat")} ${questionSpeech(q)}`);
+      if (token !== P.vc.token) return false;
+      setVcStatus("listening");
+      const heard = await listenOnce(text => markHeard(qEl, text, "", null));
+      if (token !== P.vc.token) return false;
+      if (!heard) { if (q.optional) break; continue; }
+      setVcStatus("thinking");
+      let result = { value: null };
+      try { result = await api("/api/portal/checkin/interpret", { method: "POST", body: JSON.stringify({ symptom: prefix, question: q.id, heard, lang: lang() }) }); } catch { /* fall back to tapping */ }
+      if (token !== P.vc.token) return false;
+      if (result.value !== null && result.value !== undefined) {
+        voiceStore[q.id] = heard;
+        store[q.id] = result.value;
+        const input = q.type === "choice" ? $(`#wizard input[name="${CSS.escape(`${prefix}.${q.id}`)}"][value="${CSS.escape(String(result.value))}"]`) : $(`#wizard input[name="${CSS.escape(`${prefix}.${q.id}`)}"]`);
+        if (input) { if (q.type === "choice") input.checked = true; else input.value = result.value; }
+        qEl?.classList.remove("missing");
+        markHeard(qEl, heard, q.type === "date" ? fmtDate(result.value) : q.type === "number" ? `${result.value} °C` : result.label, true);
+        answered = true;
+      } else {
+        markHeard(qEl, heard, "", false);
+      }
+    }
+    if (!answered && !q.optional) {
+      setVcStatus("idle", t("vcTapInstead"));
+      await speak(t("vcTapInstead"));
+      qEl?.classList.remove("asking");
+      return false;  // wait for the patient to tap; the 🎤 button on the question restarts the conversation
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  qElClear();
+  return true;
+}
+function qElClear() { $$("#wizard .q.asking").forEach(el => el.classList.remove("asking")); }
+async function runConversation({ intro = true } = {}) {
+  if (!P.voiceQA || !SR_CLASS()) return;
+  const ci = P.ci, token = ++P.vc.token;
+  if (ci.step === "confirm") { setVcStatus("speaking"); await speak(t("vcConfirm")); if (token === P.vc.token) setVcStatus("idle", ""); return; }
+  if (ci.step === "review") { await speak(t("vcReview")); return; }
+  let questions, prefix, store;
+  if (ci.step === "symptom") {
+    prefix = ci.selected[ci.idx]; questions = symptomSpec(prefix).questions; store = ci.answers[prefix] || (ci.answers[prefix] = {});
+    if (intro) { setVcStatus("speaking"); await speak(t("vcAbout", { s: L(symptomSpec(prefix).label) })); }
+  } else if (ci.step === "safety") {
+    prefix = "safety"; questions = P.bank.safety; store = ci.safety;
+    if (intro) { setVcStatus("speaking"); await speak(t("safetyHint")); }
+  } else return;
+  if (token !== P.vc.token) return;
+  const complete = await askByVoice(questions, prefix, store, token);
+  if (complete && token === P.vc.token) {
+    setVcStatus("idle", "✓");
+    await new Promise(r => setTimeout(r, 700));
+    if (token === P.vc.token) wizardAction("next");
+  }
 }
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(",")[1] || ""); r.onerror = () => reject(new Error("Could not read the recording.")); r.readAsDataURL(blob); });
@@ -318,9 +486,13 @@ async function goConfirm(fromList) {
   const form = $("#reportForm");
   if (P.listening) { stopVoice(false); await new Promise(r => setTimeout(r, 350)); }
   const text = $("#reportText").value.trim();
-  const audio = $("#attachAudio").checked && P.mode === "voice" ? P.audioBlob : null;
+  const audio = $("#attachAudio").checked && P.mode === "voice" ? recBlob() : null;
   if (!fromList && !text && !audio) return formError(form, t("needInput"));
   formError(form, "");
+  // spoken answers → ask the follow-up questions aloud, in the language the patient spoke
+  P.voiceQA = P.usedVoice && P.mode === "voice" && !!SR_CLASS();
+  const spoken = $("#speechLang").value.slice(0, 2);
+  if (P.voiceQA && STR[spoken] && spoken !== lang()) setLang(spoken);
   P.ci.fromList = fromList; P.ci.none = false;
   if (text && !fromList) {
     const btn = $("button[type=submit]", form);
@@ -342,15 +514,18 @@ function stepHead(stepText, title, hint = "") {
 }
 function qHtml(q, prefix, value) {
   const name = `${prefix}.${q.id}`;
-  const opt = q.optional ? ` <small class="muted">(${esc(t("optional"))})</small>` : "";
+  const heard = P.ci?.voice?.[prefix]?.[q.id];
+  const mic = SR_CLASS() ? ` <button type="button" class="q-mic" data-wz="ask" data-prefix="${esc(prefix)}" data-qid="${esc(q.id)}" title="${esc(t("vcAnswerByVoice"))}" aria-label="${esc(t("vcAnswerByVoice"))}">🎤</button>` : "";
+  const opt = (q.optional ? ` <small class="muted">(${esc(t("optional"))})</small>` : "") + mic;
+  const heardBox = `<div class="vc-heard" ${heard ? "" : "hidden"}>${heard ? `<span>🎤 “${esc(heard)}”</span>` : ""}</div>`;
   if (q.type === "choice") {
     return `<fieldset class="q" data-q="${q.id}" data-required="${q.optional ? "" : "1"}"><legend>${esc(L(q.text))}${opt}</legend>
-      <div class="opts ${q.options.length <= 3 && q.options.every(o => o.label.en.length <= 22) ? "row" : ""}">${q.options.map(o => `<label class="opt"><input type="radio" name="${esc(name)}" value="${esc(o.value)}" ${value === o.value ? "checked" : ""} /><span>${esc(L(o.label))}</span></label>`).join("")}</div></fieldset>`;
+      <div class="opts ${q.options.length <= 3 && q.options.every(o => o.label.en.length <= 22) ? "row" : ""}">${q.options.map(o => `<label class="opt"><input type="radio" name="${esc(name)}" value="${esc(o.value)}" ${value === o.value ? "checked" : ""} /><span>${esc(L(o.label))}</span></label>`).join("")}</div>${heardBox}</fieldset>`;
   }
   if (q.type === "number") {
-    return `<label class="field q" data-q="${q.id}"><span>${esc(L(q.text))}${opt}</span><input type="number" name="${esc(name)}" inputmode="decimal" step="${q.step || 0.1}" min="${q.min}" max="${q.max}" value="${value ?? ""}" placeholder="37.8" /></label>`;
+    return `<label class="field q" data-q="${q.id}"><span>${esc(L(q.text))}${opt}</span><input type="number" name="${esc(name)}" inputmode="decimal" step="${q.step || 0.1}" min="${q.min}" max="${q.max}" value="${value ?? ""}" placeholder="37.8" />${heardBox}</label>`;
   }
-  return `<label class="field q" data-q="${q.id}"><span>${esc(L(q.text))}${opt}</span><input type="date" name="${esc(name)}" max="${today()}" value="${value ?? ""}" /></label>`;
+  return `<label class="field q" data-q="${q.id}"><span>${esc(L(q.text))}${opt}</span><input type="date" name="${esc(name)}" max="${today()}" value="${value ?? ""}" />${heardBox}</label>`;
 }
 function readQuestions(questions, prefix, store, validate) {
   const missing = [];
@@ -375,20 +550,25 @@ function answerText(q, v) {
 function renderWizard() {
   const ci = P.ci, w = $("#wizard");
   if (!P.bank) return;
+  stopConversation();
   $("#reportForm").hidden = true; w.hidden = false;
+  const vcBar = SR_CLASS() && ["confirm", "symptom", "safety", "review"].includes(ci.step) ? `<div class="vc-bar">
+      <label class="vc-toggle"><input type="checkbox" id="voiceQA" ${P.voiceQA ? "checked" : ""} /><span>${esc(t("vcToggle"))}</span></label>
+      <span class="vc-status" data-state="idle"></span></div>
+      ${P.voiceQA && !canSpeak() ? `<p class="vc-note">${esc(t("vcNoVoice"))}</p>` : ""}` : "";
   const nav = (nextLabel = t("next"), action = "next") => `<div class="wz-nav"><button class="button secondary" type="button" data-wz="back">${esc(t("back"))}</button><button class="button primary" type="button" data-wz="${action}">${esc(nextLabel)}</button></div><p class="form-error" role="alert" hidden></p>`;
   if (ci.step === "confirm") {
     const common = new Set(P.bank.common || []);
     const tagCommon = common.size > 0 && common.size <= 6;  // a tag on every chip is noise
     const keys = [...P.bank.symptoms.map(s => s.key).sort((a, b) => (common.has(b) - common.has(a))), "other"];
-    w.innerHTML = stepHead(t("step2"), t("confirmTitle"), ci.detected.length && !ci.fromList ? t("confirmHintFound") : t("confirmHintNone")) +
+    w.innerHTML = vcBar + stepHead(t("step2"), t("confirmTitle"), ci.detected.length && !ci.fromList ? t("confirmHintFound") : t("confirmHintNone")) +
       `<div class="sym-grid">${keys.map(k => `<label class="sym ${ci.detected.includes(k) ? "found" : ""}"><input type="checkbox" value="${k}" ${ci.selected.includes(k) ? "checked" : ""} /><span>${esc(L(symptomSpec(k).label))}${tagCommon && common.has(k) ? `<small>${esc(t("commonTag"))}</small>` : ""}</span></label>`).join("")}</div>` + nav();
   } else if (ci.step === "symptom") {
     const key = ci.selected[ci.idx], spec = symptomSpec(key), store = ci.answers[key] || (ci.answers[key] = {});
-    w.innerHTML = stepHead(t("stepSymptom", { i: ci.idx + 1, n: ci.selected.length }), L(spec.label)) +
+    w.innerHTML = vcBar + stepHead(t("stepSymptom", { i: ci.idx + 1, n: ci.selected.length }), L(spec.label)) +
       spec.questions.map(q => qHtml(q, key, store[q.id])).join("") + nav();
   } else if (ci.step === "safety") {
-    w.innerHTML = stepHead(t("stepSafety"), t("safetyTitle"), t("safetyHint")) + P.bank.safety.map(q => qHtml(q, "safety", ci.safety[q.id])).join("") + nav();
+    w.innerHTML = vcBar + stepHead(t("stepSafety"), t("safetyTitle"), t("safetyHint")) + P.bank.safety.map(q => qHtml(q, "safety", ci.safety[q.id])).join("") + nav();
   } else if (ci.step === "review") {
     const text = $("#reportText").value.trim();
     const blocks = ci.selected.map((key, i) => {
@@ -398,13 +578,14 @@ function renderWizard() {
         <dl>${rows.map(([q, v]) => `<dt>${esc(L(q.text))}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div>`;
     }).join("");
     const safety = P.bank.safety.map(q => `<dt>${esc(L(q.text))}</dt><dd>${esc(answerText(q, ci.safety[q.id]) || "—")}</dd>`).join("");
-    w.innerHTML = stepHead(t("stepReview"), t("reviewTitle")) +
+    w.innerHTML = vcBar + stepHead(t("stepReview"), t("reviewTitle")) +
       (text ? `<div class="rv-block"><div class="rv-head"><strong>${esc(t("yourWords"))}</strong></div><p class="quote">${esc(text)}</p></div>` : "") +
       (blocks || `<div class="rv-block"><strong>${esc(t("noNew"))}</strong></div>`) +
       `<div class="rv-block"><div class="rv-head"><strong>${esc(t("safetyTitle"))}</strong><button class="link-button small" type="button" data-wz="edit-safety">${esc(t("edit"))}</button></div><dl>${safety}</dl></div>` +
       nav(t("send"), "send");
   }
   w.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (P.voiceQA) setTimeout(runConversation, 400);
 }
 function wizardError(msg) { const b = $("#wizard .form-error"); if (b) { b.textContent = msg || ""; b.hidden = !msg; } }
 function saveCurrent(validate) {
@@ -416,6 +597,26 @@ function saveCurrent(validate) {
 }
 async function wizardAction(action, el) {
   const ci = P.ci;
+  if (action === "ask") {
+    // answer this question (and any later unanswered ones) by voice
+    P.voiceQA = true;
+    const toggle = $("#voiceQA"); if (toggle) toggle.checked = true;
+    const store = el.dataset.prefix === "safety" ? ci.safety : (ci.answers[el.dataset.prefix] || (ci.answers[el.dataset.prefix] = {}));
+    saveCurrent(false);
+    delete store[el.dataset.qid];
+    const input = $(`#wizard input[name="${CSS.escape(`${el.dataset.prefix}.${el.dataset.qid}`)}"]:checked`); if (input) input.checked = false;
+    stopConversation();
+    const token = P.vc.token;
+    const questions = el.dataset.prefix === "safety" ? P.bank.safety : symptomSpec(el.dataset.prefix).questions;
+    const from = questions.findIndex(q => q.id === el.dataset.qid);
+    const complete = await askByVoice(questions.slice(from), el.dataset.prefix, store, token);
+    if (complete && token === P.vc.token && questions.every(q => q.optional || (store[q.id] !== undefined && store[q.id] !== ""))) {
+      await new Promise(r => setTimeout(r, 700));
+      if (token === P.vc.token) wizardAction("next");
+    }
+    return;
+  }
+  stopConversation();
   if (action === "back") {
     saveCurrent(false);
     if (ci.step === "confirm") { showDescribe(); return; }
@@ -443,9 +644,10 @@ async function wizardAction(action, el) {
 async function sendCheckin(btn) {
   const ci = P.ci;
   const text = $("#reportText").value.trim();
-  const audio = $("#attachAudio").checked && P.usedVoice ? P.audioBlob : null;
-  const payload = { text, symptoms: ci.selected, input_mode: P.usedVoice ? "voice" : "text", language: P.usedVoice ? $("#speechLang").value : lang(),
-    ui_language: lang(), checkin: { symptoms: ci.selected, answers: ci.answers, safety: ci.safety } };
+  const audio = $("#attachAudio").checked ? await recFinish() : (recDiscard(), null);
+  const spoken = P.usedVoice || Object.keys(ci.voice).length > 0;
+  const payload = { text, symptoms: ci.selected, input_mode: spoken ? "voice" : "text", language: spoken ? (SPEECH_FOR[lang()] || $("#speechLang").value) : lang(),
+    ui_language: lang(), checkin: { symptoms: ci.selected, answers: ci.answers, safety: ci.safety, voice: ci.voice } };
   if (audio) {
     if (audio.size > 8_000_000) return wizardError("The recording is too long. Please keep it under about 5 minutes.");
     payload.audio_base64 = await blobToBase64(audio);
@@ -455,7 +657,7 @@ async function sendCheckin(btn) {
   try {
     const sent = await api("/api/portal/reports", { method: "POST", body: JSON.stringify(payload) });
     $("#reportForm").reset(); $("#attachAudio").checked = true;
-    P.audioBlob = null; P.usedVoice = false; $("#audioPreview").hidden = true; $("#micLabel").textContent = t("micStart");
+    P.usedVoice = false; P.voiceQA = false; $("#audioPreview").hidden = true; $("#micLabel").textContent = t("micStart");
     newCheckin(); showDescribe();
     $("#sentPanel").innerHTML = sent.emergency_message
       ? `<article class="card alert-card" role="alert"><h2>${esc(t("urgentTitle"))}</h2><p>${esc(t("urgentBody"))}</p>${lang() === "en" ? `<p class="small">We noticed: ${sent.red_flags.map(f => esc(f.label)).join("; ")}.</p>` : ""}<a class="button full" href="tel:112">${esc(t("call112"))}</a></article>`
@@ -482,13 +684,19 @@ $("#signOut").addEventListener("click", signOut);
 $("#reportForm").addEventListener("submit", e => { e.preventDefault(); goConfirm(false); });
 $("#pickFromList").addEventListener("click", () => goConfirm(true));
 $("#noSymptoms").addEventListener("click", goSafetyOnly);
-$("#wizard").addEventListener("change", e => { e.target.closest(".q")?.classList.remove("missing"); if (!$("#wizard .q.missing")) wizardError(""); });
+$("#wizard").addEventListener("change", e => {
+  if (e.target.id === "voiceQA") { P.voiceQA = e.target.checked; if (P.voiceQA) { if (!canSpeak()) renderWizard(); else runConversation(); } else stopConversation(); return; }
+  // a tap during the spoken questions answers that question; carry on with the next one
+  if (P.voiceQA && e.target.closest(".q")?.classList.contains("asking")) {
+    saveCurrent(false); stopConversation(); setTimeout(() => runConversation({ intro: false }), 300);
+  } e.target.closest(".q")?.classList.remove("missing"); if (!$("#wizard .q.missing")) wizardError(""); });
 $("#wizard").addEventListener("click", e => { const b = e.target.closest("[data-wz]"); if (b) wizardAction(b.dataset.wz, b); });
 $("#micButton").addEventListener("click", toggleVoice);
 $$(".mode").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
 $$("[data-ui-lang]").forEach(b => b.addEventListener("click", () => setLang(b.dataset.uiLang)));
 window.addEventListener("hashchange", route);
 newCheckin();
+try { window.speechSynthesis?.getVoices(); window.speechSynthesis?.addEventListener?.("voiceschanged", () => {}); } catch { /* noop */ }
 let savedLang = "en";
 try { savedLang = localStorage.getItem("oncocare.portal.lang") || "en"; } catch { /* private mode */ }
 setLang(savedLang);

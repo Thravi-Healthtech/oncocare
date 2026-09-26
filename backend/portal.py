@@ -555,7 +555,7 @@ def create_report(db_path: str, patient_id: int, payload: dict[str, Any], upload
         if not all(safety.get(q["id"]) for q in questionnaire.SAFETY_QUESTIONS):
             raise PortalError(422, "Please answer the safety questions.")
         try:
-            checkin = questionnaire.evaluate(symptoms, raw.get("answers") or {}, safety)
+            checkin = questionnaire.evaluate(symptoms, raw.get("answers") or {}, safety, raw.get("voice") if isinstance(raw.get("voice"), dict) else None)
         except questionnaire.CheckinError as error:
             raise PortalError(422, str(error)) from None
         if checkin["onset"] and not payload.get("onset_date"):

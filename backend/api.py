@@ -20,6 +20,7 @@ from .database import CLINICIAN, normalise_phone, record_cycle_revision, row_or_
 from .extraction import ai_status, extract_candidates, save_ai_settings
 from . import auth, portal
 from .portal import PortalError
+from . import questionnaire, voice_answers
 from http.cookies import SimpleCookie
 
 PORTAL_COOKIE = "oncocare_portal"
@@ -1183,6 +1184,14 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             if path == "/api/portal/checkin/detect" and method == "POST":
                 body = self._body()
                 return {"data": portal.detect_symptoms(str(body.get("text") or ""))}, HTTPStatus.OK
+            if path == "/api/portal/checkin/interpret" and method == "POST":
+                body = self._body()
+                try:
+                    result = voice_answers.interpret(str(body.get("symptom") or ""), str(body.get("question") or ""),
+                                                     str(body.get("heard") or ""), str(body.get("lang") or "en"))
+                except questionnaire.CheckinError as error:
+                    raise PortalError(422, str(error)) from None
+                return {"data": result}, HTTPStatus.OK
             if path == "/api/portal/reports" and method == "POST":
                 body = self._body(MAX_UPLOAD_JSON)
                 body.pop("_sync_triage", None)

@@ -172,13 +172,14 @@ function checkinHtml(r, { actions = false, compact = false } = {}) {
           ${done ? `<span class="chip chip-teal">✓ Recorded G${done.grade}</span>` : actions ? `<button class="button ${i.grade_suggestion ? "primary" : "secondary"} small" data-report-record="${r.id}" data-item="${esc(i.key)}" data-term="${esc(i.term || "")}" data-grade="${i.grade_suggestion || ""}">Grade &amp; record</button>` : ""}
         </div>
       </div>
-      <table class="ci-answers"><tbody>${i.answers.map(a => `<tr><th>${esc(a.question)}</th><td>${esc(a.answer)}</td></tr>`).join("")}</tbody></table>
+      <table class="ci-answers"><tbody>${i.answers.map(a => `<tr><th>${esc(a.question)}</th><td>${esc(a.answer)}${a.heard ? `<small class="ci-heard">🎤 “${esc(a.heard)}”</small>` : ""}</td></tr>`).join("")}</tbody></table>
+      ${i.onset_heard ? `<p class="ci-rationale">Onset — patient said 🎤 “${esc(i.onset_heard)}”</p>` : ""}
       <p class="ci-rationale">${i.grade_suggestion ? "Suggested" : "No grade suggested"}: ${esc(i.rationale)}</p>
     </div>`;
   }).join("");
-  const safety = (c.safety || []).map(a => `<span class="chip ${SAFETY_BAD[a.id]?.includes(a.value) ? "chip-alert" : ""}" title="${esc(a.question)}">${esc(SAFETY_SHORT[a.id] || a.id)}: ${esc(a.answer)}</span>`).join("");
+  const safety = (c.safety || []).map(a => `<span class="chip ${SAFETY_BAD[a.id]?.includes(a.value) ? "chip-alert" : ""}" title="${esc(a.question)}${a.heard ? ` — patient said: ${esc(a.heard)}` : ""}">${a.heard ? "🎤 " : ""}${esc(SAFETY_SHORT[a.id] || a.id)}: ${esc(a.answer)}</span>`).join("");
   return `<section class="checkin">
-    <p class="eyebrow">Patient check-in${r.ui_language && r.ui_language !== "en" ? ` · answered in ${{ hi: "Hindi", te: "Telugu" }[r.ui_language] || r.ui_language}` : ""}</p>
+    <p class="eyebrow">Patient check-in${c.by_voice ? " · questions asked and answered by voice" : ""}${r.ui_language && r.ui_language !== "en" ? ` · answered in ${{ hi: "Hindi", te: "Telugu" }[r.ui_language] || r.ui_language}` : ""}</p>
     ${items || '<p class="muted small">No new symptoms reported.</p>'}
     ${safety ? `<div class="ci-safety"><span class="muted small">Safety check</span>${safety}</div>` : ""}
   </section>`;

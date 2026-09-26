@@ -851,3 +851,4 @@ details.flag-item > summary::-webkit-details-marker { display: none; }
 .ci-compact { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
 @media (max-width: 640px) { .ci-head { flex-direction: column; } .ci-answers th { width: 50%; } }
 .ci-answers th { text-transform: none; letter-spacing: 0; background: none; font-size: 13px; }
+.ci-heard { display: block; margin-top: 2px; font-weight: 500; color: var(--muted); font-size: 12px; }

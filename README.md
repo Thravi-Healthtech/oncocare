@@ -118,6 +118,19 @@ Red-flag answers (e.g. cannot keep fluids down, ≥6 vomits/24 h, fever, bleedin
 
 Hindi and Telugu wording was written for this prototype and should be checked by native speakers before use with patients. Suggested grades are prompts only; the clinician selects and confirms every grade.
 
+## v0.8: Spoken follow-up questions
+
+When the patient describes their symptoms by **voice**, the check-in continues as a spoken conversation **in the same language** (English, Hindi or Telugu; the question language switches to match the speech language):
+
+- The app reads each follow-up question and its answer choices aloud (browser text-to-speech), then listens for the answer (browser speech-to-text).
+- The spoken answer is matched to an answer choice (`backend/voice_answers.py`). Rules come first: counts ("మూడుసార్లు", "तीन बार", "3 times"), dates ("నిన్న", "3 दिन से", "last week"), temperatures (°F converted), yes/no and phrases for each question in all three languages. Claude is used only when the rules can't decide and AI is on.
+- The patient sees what was heard and which answer was picked, and can tap a different answer or press 🎤 on any question to answer it again. If an answer isn't understood twice, the app asks them to tap it.
+- Safety questions are asked aloud the same way. When everything is answered, the app moves on by itself.
+- **Recording:** the patient's voice is recorded while they speak (describe step and every answer) into one audio file sent with the check-in. The questions themselves are not recorded.
+- **Doctor view:** each answer shows what the patient said (🎤 "…") under the chosen answer, the panel says "questions asked and answered by voice", and the recording plays on the card. AI triage also receives the transcripts.
+
+The spoken questions need a text-to-speech voice for the language on the patient's device. Chrome and Safari usually have Hindi; for Telugu on a Mac, add a voice in System Settings › Accessibility › Spoken Content › System voice › Manage voices. Without one, the questions are shown on screen and the patient can still answer by speaking. Use Chrome, Edge or Safari for speech recognition.
+
 ## Run locally
 
 No installation or build step is needed. Python 3.10+ and SQLite from the standard library are enough.
