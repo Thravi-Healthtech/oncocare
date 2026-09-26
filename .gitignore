@@ -1,0 +1,19 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Runtime data (local SQLite DB and clinician uploads)
+data/oncocare.db
+data/oncocare.db-shm
+data/oncocare.db-wal
+data/uploads/
+outputs_tmp/
+
+# OS / editor cruft
+.DS_Store
+.fuse_hidden*

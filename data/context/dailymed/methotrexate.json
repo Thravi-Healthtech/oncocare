@@ -1,0 +1,426 @@
+{
+ "drug": "Methotrexate",
+ "setid": "dd035a9f-cd40-4314-b9d8-2294b8a924e2",
+ "title": "METHOTREXATE INJECTION [ACCORD HEALTHCARE, INC.]",
+ "spl_version": 7,
+ "published_date": "2026-09-07",
+ "url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=dd035a9f-cd40-4314-b9d8-2294b8a924e2",
+ "fetched_at": "2026-09-26T10:31:07+00:00",
+ "sections": {
+  "Boxed Warning": 4369,
+  "Warnings and Precautions": 12633,
+  "Adverse Reactions": 6131
+ },
+ "terms": {
+  "Nausea": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "nausea",
+     "text": "\u2026sed Risk of Adverse Reactions due to Third Space Accumulation [see Warnings and Precautions ( 5.17 )] Common adverse reactions include ulcerative stomatitis, leukopenia, nausea and abdominal distress."
+    }
+   ],
+   "boxed": false
+  },
+  "Vomiting": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "vomiting",
+     "text": "5.9 Gastrointestinal Toxicity Methotrexate can cause diarrhea, vomiting, stomatitis, hemorrhagic enteritis and fatal intestinal perforation [see Adverse Reactions ( 6.1 )]."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "vomiting",
+     "text": "Incidence \u226510%: Elevated liver function tests 15%, nausea/vomiting 10%."
+    }
+   ],
+   "boxed": false
+  },
+  "Diarrhea": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "diarrhea",
+     "text": "5.9 Gastrointestinal Toxicity Methotrexate can cause diarrhea, vomiting, stomatitis, hemorrhagic enteritis and fatal intestinal perforation [see Adverse Reactions ( 6.1 )]."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "diarrhea",
+     "text": "Incidence 1% to <3%: Rash/pruritus/dermatitis, diarrhea, alopecia, leukopenia (white blood cell count less than 3000/mm 3 ), pancytopenia, dizziness."
+    }
+   ],
+   "boxed": false
+  },
+  "Mucositis oral": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "stomatitis",
+     "text": "5.9 Gastrointestinal Toxicity Methotrexate can cause diarrhea, vomiting, stomatitis, hemorrhagic enteritis and fatal intestinal perforation [see Adverse Reactions ( 6.1 )]."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "stomatitis",
+     "text": "\u2026autions ( 5.14 )] Increased Risk of Adverse Reactions due to Third Space Accumulation [see Warnings and Precautions ( 5.17 )] Common adverse reactions include ulcerative stomatitis, leukopenia, nausea and abdominal distress."
+    }
+   ],
+   "boxed": false
+  },
+  "Anorexia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "anorexia",
+     "text": "Other less common adverse reactions: Decreased hematocrit, headache, upper respiratory infection, anorexia, arthralgias, chest pain, coughing, dysuria, eye discomfort, epistaxis, fever, infection, sweating, tinnitus, vaginal discharge."
+    }
+   ],
+   "boxed": false
+  },
+  "Fatigue": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "fatigue",
+     "text": "Other frequently reported adverse reactions are infection, malaise, fatigue, chills, fever, and dizziness."
+    }
+   ],
+   "boxed": false
+  },
+  "Fever": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "fever",
+     "text": "\u2026te can cause the following additional neurologic adverse reactions: Acute chemical arachnoiditis manifested by symptoms such as headache, back pain, nuchal rigidity, and fever."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "fever",
+     "text": "Other frequently reported adverse reactions are infection, malaise, fatigue, chills, fever, and dizziness."
+    }
+   ],
+   "boxed": false
+  },
+  "Infusion related reaction": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "anaphylaxis",
+     "text": "Methotrexate Injection is contraindicated in patients with a history of severe hypersensitivity reactions to methotrexate, including anaphylaxis [see Contraindications ( 4 ) and Warnings and Precautions ( 5.2 )]."
+    },
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "hypersensitivity reaction",
+     "text": "If signs or symptoms of anaphylaxis or any other serious hypersensitivity reaction occurs, immediately discontinue Methotrexate Injection and institute appropriate therapy [see Contraindications ( 4 )] ."
+    }
+   ],
+   "boxed": true
+  },
+  "Peripheral sensory neuropathy": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "neurotoxicity",
+     "text": "Neurotoxicity Due to Intrathecal Administration Serious neurotoxicity can occur following the intrathecal administration of Methotrexate Injection containing the preservative benzyl a\u2026"
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "neuropathy",
+     "text": "\u2026retinal vein thrombosis, thrombophlebitis, and pulmonary embolus), pericarditis, pericardial effusion, hypotension, sudden death Endocrine: Diabetes Eye disorders: Optic neuropathy, blurred vision, ocular irritation, conjunctivitis, xerophthalmia Gastrointestinal disorders: Hemorrhagic enteritis, intestinal perforation, gingivitis, pancreatitis, ph\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Tinnitus": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "tinnitus",
+     "text": "\u2026Decreased hematocrit, headache, upper respiratory infection, anorexia, arthralgias, chest pain, coughing, dysuria, eye discomfort, epistaxis, fever, infection, sweating, tinnitus, vaginal discharge."
+    }
+   ],
+   "boxed": false
+  },
+  "Alopecia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "alopecia",
+     "text": "Incidence 1% to <3%: Rash/pruritus/dermatitis, diarrhea, alopecia, leukopenia (white blood cell count less than 3000/mm 3 ), pancytopenia, dizziness."
+    }
+   ],
+   "boxed": false
+  },
+  "Rash maculo-papular": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "dermatitis",
+     "text": "5.11 Dermatologic Reactions Severe, including fatal, dermatologic reactions, such as toxic epidermal necrolysis, Stevens-Johnson syndrome, exfoliative dermatitis, skin necrosis, and erythema multiforme, can occur with methotrexate [see Adverse Reactions ( 6.1 , 6.2 )]."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "rash",
+     "text": "Incidence 1% to <3%: Rash/pruritus/dermatitis, diarrhea, alopecia, leukopenia (white blood cell count less than 3000/mm 3 ), pancytopenia, dizziness."
+    }
+   ],
+   "boxed": false
+  },
+  "Myalgia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "myalgia",
+     "text": "\u2026ystem disorders: Anaphylaxis, anaphylactoid reactions, vasculitis Metabolism: Hyperglycemia Musculoskeletal disorders: Stress fracture, soft tissue necrosis, arthralgia, myalgia, osteoporosis Nervous system disorders: Headaches, drowsiness, blurred vision, speech impairment (including dysarthria and aphasia), transient cognitive dysfunction, moo\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Arthralgia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "arthralgia",
+     "text": "\u2026ure Immune system disorders: Anaphylaxis, anaphylactoid reactions, vasculitis Metabolism: Hyperglycemia Musculoskeletal disorders: Stress fracture, soft tissue necrosis, arthralgia, myalgia, osteoporosis Nervous system disorders: Headaches, drowsiness, blurred vision, speech impairment (including dysarthria and aphasia), transient cognitive dysfunc\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Acute kidney injury": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "acute renal failure",
+     "text": "5.6 Renal Toxicity Methotrexate can cause renal toxicity including irreversible acute renal failure."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "renal failure",
+     "text": "Also, spinal radiculopathy with intrathecal use Renal disorders: Severe renal toxicity including renal failure, azotemia, hematuria, proteinuria, cystitis Reproductive disorders: Defective oogenesis or spermatogenesis, loss of libido, impotence, gynecomastia, menstrual dysfunctio\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Creatinine increased": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "renal toxicity",
+     "text": "5.6 Renal Toxicity Methotrexate can cause renal toxicity including irreversible acute renal failure."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "renal toxicity",
+     "text": "\u2026tivity Reactions [see Warnings and Precautions ( 5.2 )] Myelosuppression [see Warnings and Precautions ( 5.4 )] Serious Infections [see Warnings and Precautions ( 5.5 )] Renal Toxicity [see Warnings and Precautions ( 5.6 )] Hepatotoxicity [see Warnings and Precautions ( 5.7 )] Neurotoxicity [see Warnings and Precautions ( 5.8 )] Gastrointestinal Toxici\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Cystitis noninfective": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "cystitis",
+     "text": "Also, spinal radiculopathy with intrathecal use Renal disorders: Severe renal toxicity including renal failure, azotemia, hematuria, proteinuria, cystitis Reproductive disorders: Defective oogenesis or spermatogenesis, loss of libido, impotence, gynecomastia, menstrual dysfunction Respiratory disorders: Pulmonary fibrosis,\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Pneumonitis": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "pneumonitis",
+     "text": "5.10 Pulmonary Toxicity Methotrexate-induced pulmonary toxicity including acute or chronic interstitial pneumonitis and irreversible or fatal cases can occur at all dose levels."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "pneumonitis",
+     "text": "\u2026wo other controlled trials of patients (n=680) with RA on 7.5 mg per week to 15 mg per week oral doses showed the following adverse reactions: Incidence 1%: Interstitial pneumonitis."
+    }
+   ],
+   "boxed": false
+  },
+  "Neutrophil count decreased": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "neutropenia",
+     "text": "5.4 Myelosuppression Methotrexate suppresses hematopoiesis and can cause severe and life-threatening pancytopenia, anemia, aplastic anemia, leukopenia, neutropenia, and thrombocytopenia [see Adverse Reactions ( 6.1 )] ."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "myelosuppression",
+     "text": "\u2026TIONS The following adverse reactions are described, or described in greater detail, in other sections: Hypersensitivity Reactions [see Warnings and Precautions ( 5.2 )] Myelosuppression [see Warnings and Precautions ( 5.4 )] Serious Infections [see Warnings and Precautions ( 5.5 )] Renal Toxicity [see Warnings and Precautions ( 5.6 )] Hepatotoxicity [se\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Platelet count decreased": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "thrombocytopenia",
+     "text": "5.4 Myelosuppression Methotrexate suppresses hematopoiesis and can cause severe and life-threatening pancytopenia, anemia, aplastic anemia, leukopenia, neutropenia, and thrombocytopenia [see Adverse Reactions ( 6.1 )] ."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "thrombocytopenia",
+     "text": "Incidence 3% to <10%: Stomatitis, thrombocytopenia (platelet count less than 100,000/mm 3 )."
+    }
+   ],
+   "boxed": false
+  },
+  "White blood cell decreased": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "leukopenia",
+     "text": "5.4 Myelosuppression Methotrexate suppresses hematopoiesis and can cause severe and life-threatening pancytopenia, anemia, aplastic anemia, leukopenia, neutropenia, and thrombocytopenia [see Adverse Reactions ( 6.1 )] ."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "leukopenia",
+     "text": "\u202614 )] Increased Risk of Adverse Reactions due to Third Space Accumulation [see Warnings and Precautions ( 5.17 )] Common adverse reactions include ulcerative stomatitis, leukopenia, nausea and abdominal distress."
+    }
+   ],
+   "boxed": false
+  },
+  "Anemia": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "anemia",
+     "text": "5.4 Myelosuppression Methotrexate suppresses hematopoiesis and can cause severe and life-threatening pancytopenia, anemia, aplastic anemia, leukopenia, neutropenia, and thrombocytopenia [see Adverse Reactions ( 6.1 )] ."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "anemia",
+     "text": "Blood and lymphatic system disorders: Aplastic anemia, lymphadenopathy, hypogammaglobulinemia Cardiovascular disorders: Thromboembolic events (including arterial thrombosis, cerebral thrombosis, deep vein thrombosis, retina\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Alanine aminotransferase increased": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "hepatotoxicity",
+     "text": "5.7 Hepatotoxicity Methotrexate can cause severe and potentially irreversible hepatotoxicity including fibrosis, cirrhosis, and fatal liver failure [see Adverse Reactions ( 6.1 , 6.2 )]."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "hepatotoxicity",
+     "text": "\u2026] Myelosuppression [see Warnings and Precautions ( 5.4 )] Serious Infections [see Warnings and Precautions ( 5.5 )] Renal Toxicity [see Warnings and Precautions ( 5.6 )] Hepatotoxicity [see Warnings and Precautions ( 5.7 )] Neurotoxicity [see Warnings and Precautions ( 5.8 )] Gastrointestinal Toxicity [see Warnings and Precautions ( 5.9 )] Pulmonary To\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Aspartate aminotransferase increased": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "hepatotoxicity",
+     "text": "5.7 Hepatotoxicity Methotrexate can cause severe and potentially irreversible hepatotoxicity including fibrosis, cirrhosis, and fatal liver failure [see Adverse Reactions ( 6.1 , 6.2 )]."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "hepatotoxicity",
+     "text": "\u2026] Myelosuppression [see Warnings and Precautions ( 5.4 )] Serious Infections [see Warnings and Precautions ( 5.5 )] Renal Toxicity [see Warnings and Precautions ( 5.6 )] Hepatotoxicity [see Warnings and Precautions ( 5.7 )] Neurotoxicity [see Warnings and Precautions ( 5.8 )] Gastrointestinal Toxicity [see Warnings and Precautions ( 5.9 )] Pulmonary To\u2026"
+    }
+   ],
+   "boxed": false
+  }
+ },
+ "source": "DailyMed (U.S. National Library of Medicine) structured product label"
+}

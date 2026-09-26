@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Thravi OncoCare chemotherapy cycle intelligence prototype" />
+    <title>Thravi OncoCare</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main id="doctorLogin" class="doctor-login" hidden>
+      <div class="login-card">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="9" /></svg></span><span><strong>Thravi</strong><small>OncoCare · clinician</small></span></div>
+        <h1>Clinician sign in</h1>
+        <p class="muted">Use your registered mobile number. OTP sign-in is coming; a temporary password is used for now.</p>
+        <form id="doctorLoginForm" novalidate>
+          <label class="field"><span>Mobile number</span><input name="phone" type="tel" inputmode="tel" autocomplete="username" required /></label>
+          <label class="field"><span>Password</span><input name="password" type="password" autocomplete="current-password" required /></label>
+          <p class="form-error" role="alert" hidden></p>
+          <button class="button primary full" type="submit">Sign in</button>
+        </form>
+        <p class="muted small">Patient? <a href="/portal">Sign in to the patient portal</a> · <a href="/">Home</a></p>
+      </div>
+    </main>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="#patients" aria-label="Thravi OncoCare home">
+          <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="9" /></svg></span>
+          <span><strong>Thravi</strong><small>OncoCare</small></span>
+        </a>
+        <nav class="nav-list">
+          <a class="nav-item" href="#patients" data-nav="patients"><span class="nav-icon">♙</span><span>Patients</span></a>
+          <a class="nav-item" href="#inbox" data-nav="inbox"><span class="nav-icon">✉</span><span>Patient messages</span><span class="nav-badge hidden" id="inboxBadge">0</span></a>
+          <div id="navPatient" class="nav-group hidden">
+            <p class="nav-caption" id="navPatientName">Patient</p>
+            <a class="nav-item" data-nav="patient" href="#"><span class="nav-icon">◉</span><span>Patient record</span></a>
+          </div>
+          <div id="navPlan" class="nav-group hidden">
+            <p class="nav-caption" id="navPlanName">Treatment plan</p>
+            <a class="nav-item" data-nav="cycles" href="#"><span class="nav-icon">◎</span><span>Cycles</span></a>
+            <a class="nav-item" data-nav="review" href="#"><span class="nav-icon">✓</span><span>Pre-cycle review</span></a>
+            <a class="nav-item" data-nav="labs" href="#"><span class="nav-icon">⌁</span><span>Labs &amp; trends</span></a>
+            <a class="nav-item" data-nav="toxicities" href="#"><span class="nav-icon">◇</span><span>CTCAE toxicities</span></a>
+            <a class="nav-item" data-nav="timeline" href="#"><span class="nav-icon">↺</span><span>Longitudinal view</span></a>
+          </div>
+        </nav>
+        <div class="safety-card">
+          <span class="safety-icon">i</span>
+          <div><strong>Clinical support only</strong><p>Lab grades are computed from verified values. Symptom grades and every treatment decision are clinician-confirmed.</p></div>
+        </div>
+      </aside>
+
+      <div class="workspace">
+        <header class="topbar">
+          <button class="menu-button" id="menuButton" aria-label="Open navigation">☰</button>
+          <a class="patient-crumb patient-switcher" href="#patients" aria-label="Switch patient">
+            <span class="avatar" id="selectedPatientAvatar">—</span>
+            <span><strong id="selectedPatientName">Select a patient</strong><small id="selectedPatientMeta">Search or create a patient</small></span>
+          </a>
+          <div class="topbar-actions">
+            <button class="ai-badge" type="button" id="aiBadge" data-action="ai-settings" title="AI lab extraction settings">AI extraction: …</button>
+            <span class="demo-badge"><span></span>Synthetic data only</span>
+            <div class="clinician"><span class="avatar avatar-small" id="clinicianInitials">—</span><span><strong id="clinicianName">Signed out</strong><small id="clinicianRole"></small></span></div>
+            <button class="button secondary small" type="button" data-action="sign-out">Sign out</button>
+          </div>
+        </header>
+
+        <main id="mainContent" tabindex="-1">
+          <!-- Patients dashboard -->
+          <section class="view" data-view="patients" aria-labelledby="patientsTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Patient registry</p><h1 id="patientsTitle">Patients</h1><p>Search, open, edit or add patients. Each patient holds their own chemotherapy plans.</p></div>
+              <button class="button primary" data-action="new-patient">+ Create patient</button>
+            </div>
+            <div class="metric-grid" id="patientMetrics"></div>
+            <div class="patient-search-panel panel">
+              <label for="patientSearch">Search by name, MRN or diagnosis</label>
+              <div class="patient-search-row">
+                <input id="patientSearch" type="search" placeholder="Search patients…" autocomplete="off" />
+                <select id="patientStatusFilter" aria-label="Filter by status"><option value="all">All patients</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
+              </div>
+              <p id="patientListStatus" class="patient-list-status" role="status" aria-live="polite">Loading patients…</p>
+            </div>
+            <div id="patientList" class="patient-list"></div>
+          </section>
+
+          <!-- Patient-reported symptom inbox -->
+          <section class="view" data-view="inbox" aria-labelledby="inboxTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Patient portal</p><h1 id="inboxTitle">Patient messages</h1><p>Symptoms patients sent by voice or text. Red-flag messages are listed first. AI suggestions are for clinician review only.</p></div>
+              <label class="inline-select"><span>Show</span><select id="inboxFilter"><option value="open">Awaiting review</option><option value="">All messages</option></select></label>
+            </div>
+            <div id="inboxList" class="report-list"></div>
+          </section>
+
+          <!-- Patient record -->
+          <section class="view" data-view="patient" aria-labelledby="patientTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Patient record</p><h1 id="patientTitle">Patient</h1><p id="patientSubtitle"></p></div>
+              <div class="heading-actions"><button class="button secondary" data-action="edit-patient">Edit patient</button><button class="button danger-outline" data-action="delete-patient">Delete</button></div>
+            </div>
+            <div id="patientProfile"></div>
+          </section>
+
+          <!-- Plan: cycles -->
+          <section class="view" data-view="cycles" aria-labelledby="cyclesTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Treatment plan</p><h1 id="cyclesTitle">Cycles</h1><p class="plan-subtitle"></p></div>
+              <div class="heading-actions"><button class="button secondary" data-action="edit-plan">Edit plan</button><button class="button secondary" data-action="add-cycle">+ Add cycle</button></div>
+            </div>
+            <div id="planHeader"></div>
+            <article class="panel top-gap">
+              <div class="panel-heading"><div><p class="eyebrow">Administration record</p><h2>Cycle schedule</h2></div><div class="legend-inline"><span><i class="lab-dot verified"></i>Labs verified</span><span><i class="lab-dot unverified"></i>Awaiting verification</span><span><i class="lab-dot missing"></i>No pre-cycle labs</span></div></div>
+              <div id="cycleList" class="cycle-list"></div>
+            </article>
+          </section>
+
+          <!-- Plan: pre-cycle review -->
+          <section class="view" data-view="review" aria-labelledby="reviewTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Pre-cycle review</p><h1 id="reviewTitle">Pre-cycle review</h1><p class="plan-subtitle"></p></div>
+              <label class="inline-select"><span>Cycle</span><select id="reviewCycleSelect"></select></label>
+            </div>
+            <div id="reviewContent"></div>
+          </section>
+
+          <!-- Plan: labs -->
+          <section class="view" data-view="labs" aria-labelledby="labsTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Laboratory</p><h1 id="labsTitle">Labs &amp; trends</h1><p>Pre-cycle labs are optional, but cycles without them are marked. Trends run from baseline (first pre-cycle value) to the latest.</p></div>
+              <div class="heading-actions"><button class="button secondary" data-action="upload-labs">Upload report</button><button class="button primary" data-action="manual-labs">+ Enter labs</button></div>
+            </div>
+            <div id="labWindows" class="lab-windows"></div>
+            <article class="panel top-gap" id="flagPanel">
+              <div class="panel-heading"><div><p class="eyebrow">Trend analysis</p><h2>Lab trend flags</h2></div><span class="muted">Rule-based · latest pre-cycle window per test</span></div>
+              <div id="labFlags"></div>
+            </article>
+            <article class="panel top-gap" id="verificationPanel">
+              <div class="panel-heading"><div><p class="eyebrow">Human verification</p><h2>Extracted values awaiting confirmation</h2></div><span class="count-badge warning" id="verificationCount">0</span></div>
+              <div id="verificationQueue"></div>
+            </article>
+            <article class="panel top-gap">
+              <div class="panel-heading"><div><p class="eyebrow">Trend analysis</p><h2>Baseline → before each cycle</h2></div><span class="muted">Verified values only · latest value per cycle window</span></div>
+              <div id="labTrendTable"></div>
+            </article>
+            <div id="labCharts" class="lab-charts top-gap"></div>
+          </section>
+
+          <!-- Plan: toxicities -->
+          <section class="view" data-view="toxicities" aria-labelledby="toxTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Between-cycle assessment</p><h1 id="toxTitle">CTCAE toxicities</h1><p>Symptoms are graded by the clinician against stored CTCAE v6.0 criteria (per-term source shown). Lab-derived grades are computed from verified values; DailyMed labels show which regimen drugs list each toxicity.</p></div>
+              <button class="button primary" data-action="add-toxicity">+ Record toxicity</button>
+            </div>
+            <div id="patientReportsPanel"></div>
+            <div id="contextPanel" class="top-gap"></div>
+            <div id="ctcaeMatrix" class="top-gap"></div>
+            <article class="panel top-gap">
+              <div class="panel-heading"><div><p class="eyebrow">Between-cycle assessment</p><h2>Symptoms by assessment window</h2></div><div class="legend-inline"><span><i class="src-tag patient">Patient</i> reported in portal · review and add</span><span><i class="src-tag clinical">Clinician</i> confirmed CTCAE</span></div></div>
+              <div id="symptomList"></div>
+            </article>
+          </section>
+
+          <!-- Plan: longitudinal -->
+          <section class="view" data-view="timeline" aria-labelledby="timelineTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Longitudinal record</p><h1 id="timelineTitle">Longitudinal view</h1><p>Cycle → drugs and doses → pre-cycle labs → CTCAE with reasoning → clinician decision.</p></div>
+            </div>
+            <div id="timelineSummary"></div>
+            <div id="timeline" class="timeline top-gap"></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- Patient modal -->
+    <div class="modal" id="patientModal" role="dialog" aria-modal="true" aria-labelledby="patientModalTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card">
+        <div class="modal-heading"><div><p class="eyebrow">Patient registry</p><h2 id="patientModalTitle">Create patient</h2></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="patientForm" novalidate>
+          <div class="form-grid">
+            <label class="field span-2"><span>Medical record number</span><input name="medical_record_number" maxlength="64" required autocomplete="off" /></label>
+            <label class="field"><span>First name</span><input name="first_name" maxlength="100" required autocomplete="off" /></label>
+            <label class="field"><span>Last name</span><input name="last_name" maxlength="100" required autocomplete="off" /></label>
+            <label class="field"><span>Date of birth</span><input name="date_of_birth" type="date" /></label>
+            <label class="field"><span>Sex</span><select name="sex"><option value="">Not recorded</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></label>
+            <label class="field span-2"><span>Mobile number (patient portal sign-in)</span><input name="phone" type="tel" inputmode="tel" maxlength="20" placeholder="e.g. 98765 43210" autocomplete="off" /></label>
+            <label class="field span-2"><span>Diagnosis or clinical context</span><input name="diagnosis" maxlength="250" placeholder="Optional" /></label>
+            <label class="field span-2 hidden" id="patientActiveField"><span>Status</span><select name="active"><option value="1">Active</option><option value="0">Inactive</option></select></label>
+          </div>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit">Save patient</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Plan builder: step 1 -->
+    <div class="modal" id="planModal" role="dialog" aria-modal="true" aria-labelledby="planModalTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card large">
+        <div class="modal-heading"><div><p class="eyebrow" id="planModalStep">Step 1 of 2 · Regimen</p><h2 id="planModalTitle">Create chemotherapy plan</h2></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="planForm" novalidate>
+          <div class="form-grid">
+            <label class="field span-2"><span>Regimen name</span><input name="regimen_name" maxlength="160" placeholder="e.g. Paclitaxel + carboplatin q21d" required /></label>
+            <label class="field"><span>Treatment intent</span><select name="intent"><option value="">Not recorded</option><option value="curative">Curative</option><option value="adjuvant">Adjuvant</option><option value="neoadjuvant">Neoadjuvant</option><option value="palliative">Palliative</option><option value="other">Other</option></select></label>
+            <label class="field"><span>Status</span><select name="status"><option value="active">Active</option><option value="planned">Planned</option><option value="on_hold">On hold</option><option value="completed">Completed</option><option value="discontinued">Discontinued</option></select></label>
+            <div class="plan-schedule-fields span-2">
+              <label class="field"><span>First cycle date</span><input type="date" name="start_date" required /></label>
+              <label class="field"><span>Number of cycles</span><input type="number" name="cycle_count" min="1" max="24" step="1" value="6" required /></label>
+              <label class="field"><span>Days between cycles</span><input type="number" name="cycle_interval" min="1" max="365" step="1" value="21" required /></label>
+            </div>
+            <label class="field span-2"><span>Notes</span><textarea name="notes" rows="2" maxlength="1000" placeholder="Optional: premedication, hydration protocol, dosing basis"></textarea></label>
+          </div>
+          <div class="plan-cycle-setup" id="planMedsSection">
+            <div class="section-row"><div><p class="eyebrow">Medications</p><p class="muted">Every cycle starts with these drugs and doses. You can change any cycle on the next step.</p></div><button class="button secondary small" type="button" data-action="add-plan-med">+ Add drug</button></div>
+            <div id="planMedRows" class="med-rows"></div>
+          </div>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit" id="planSubmit">Review cycles →</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Plan builder: step 2 -->
+    <div class="modal" id="planPreviewModal" role="dialog" aria-modal="true" aria-labelledby="planPreviewTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card preview-modal">
+        <div class="modal-heading"><div><p class="eyebrow">Step 2 of 2 · Review each cycle</p><h2 id="planPreviewTitle">Review cycles before saving</h2><p id="planPreviewSummary" class="muted"></p></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="planPreviewForm" novalidate>
+          <div id="planPreviewCycles" class="preview-cycles"></div>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-action="plan-back">← Back</button><button class="button primary" type="submit">Save plan and cycles</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit single planned cycle / add cycle -->
+    <div class="modal" id="cycleModal" role="dialog" aria-modal="true" aria-labelledby="cycleModalTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card large">
+        <div class="modal-heading"><div><p class="eyebrow">Planned treatment</p><h2 id="cycleModalTitle">Edit cycle</h2></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="cycleForm" novalidate>
+          <div class="form-grid">
+            <label class="field"><span>Cycle number</span><input type="number" name="cycle_number" min="1" step="1" required /></label>
+            <label class="field"><span>Planned date</span><input type="date" name="planned_date" required /></label>
+          </div>
+          <div class="section-row"><p class="eyebrow">Medications for this cycle</p><button class="button secondary small" type="button" data-action="add-cycle-med">+ Add drug</button></div>
+          <div id="cycleMedRows" class="med-rows"></div>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button danger-outline hidden" type="button" data-action="delete-cycle">Delete cycle</button><span class="spacer"></span><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit">Save cycle</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Record cycle outcome -->
+    <div class="modal" id="recordModal" role="dialog" aria-modal="true" aria-labelledby="recordModalTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card large">
+        <div class="modal-heading"><div><p class="eyebrow">Administration record</p><h2 id="recordModalTitle">Record cycle</h2><p class="muted" id="recordModalSub"></p></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="recordForm" novalidate>
+          <div id="recordEvidence"></div>
+          <fieldset class="outcome-options">
+            <legend>What happened with this cycle?</legend>
+            <label><input type="radio" name="outcome" value="given" /><span><strong>Given as planned</strong><small>All drugs at planned dose</small></span></label>
+            <label><input type="radio" name="outcome" value="modified" /><span><strong>Given with modification</strong><small>Dose change or drug held</small></span></label>
+            <label><input type="radio" name="outcome" value="delayed" /><span><strong>Delayed</strong><small>Reschedule this cycle</small></span></label>
+            <label><input type="radio" name="outcome" value="held" /><span><strong>Not given (held)</strong><small>Cycle skipped</small></span></label>
+            <label><input type="radio" name="outcome" value="discontinued" /><span><strong>Discontinue plan</strong><small>Cancels remaining cycles</small></span></label>
+          </fieldset>
+          <div id="recordGiven" class="hidden">
+            <label class="field narrow"><span>Administration date</span><input type="date" name="administered_date" /></label>
+            <div class="table-wrap"><table class="dose-table"><thead><tr><th>Drug</th><th>Planned</th><th>Actual dose</th><th>Change</th><th>Hold</th></tr></thead><tbody id="recordMedRows"></tbody></table></div>
+          </div>
+          <div id="recordDelay" class="hidden form-grid">
+            <label class="field"><span>New planned date</span><input type="date" name="new_planned_date" /></label>
+            <label class="confirm-check align-end"><input type="checkbox" name="shift_following" checked /><span>Shift later planned cycles by the same number of days</span></label>
+          </div>
+          <div id="recordReason" class="form-grid">
+            <label class="field"><span>Reason category <em class="req-note">required unless given as planned</em></span><select name="reason_category"><option value="">Select reason</option><option>Toxicity</option><option>Laboratory findings</option><option>Clinical status</option><option>Patient preference</option><option>Logistics</option><option>Other</option></select></label>
+            <label class="field"><span>Recorded by</span><input name="recorded_by" value="" maxlength="80" /></label>
+            <label class="field span-2"><span>Clinical rationale</span><textarea name="rationale" rows="3" maxlength="2000" placeholder="Why was the cycle modified, delayed, held or stopped?"></textarea></label>
+          </div>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit">Save and sign</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Manual lab entry -->
+    <div class="modal" id="labModal" role="dialog" aria-modal="true" aria-labelledby="labModalTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card large">
+        <div class="modal-heading"><div><p class="eyebrow">Manual entry</p><h2 id="labModalTitle">Enter pre-cycle labs</h2></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="labForm" novalidate>
+          <div class="form-grid">
+            <label class="field"><span>Before cycle</span><select name="cycle_id" class="cycle-window-select" required></select></label>
+            <label class="field"><span>Collection date</span><input type="date" name="collection_date" required /></label>
+          </div>
+          <p class="muted">Fill only the tests you have. Units and reference ranges are pre-filled from the catalog and can be changed to match the report.</p>
+          <div class="table-wrap"><table class="lab-entry-table"><thead><tr><th>Test</th><th>Value</th><th>Unit</th><th>Ref low</th><th>Ref high</th></tr></thead><tbody id="labEntryRows"></tbody></table></div>
+          <label class="confirm-check"><input type="checkbox" name="confirmed" required /><span>I checked these values against the source report.</span></label>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit">Save verified values</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Upload lab report -->
+    <div class="modal" id="uploadModal" role="dialog" aria-modal="true" aria-labelledby="uploadTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card">
+        <div class="modal-heading"><div><p class="eyebrow">Document intake</p><h2 id="uploadTitle">Upload lab report</h2></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="uploadForm" novalidate>
+          <div class="form-grid">
+            <label class="field"><span>Before cycle</span><select name="cycle_id" class="cycle-window-select" required></select></label>
+            <label class="field"><span>Date of recording (sample collected)</span><input type="date" name="recording_date" required /></label>
+          </div>
+          <p class="muted field-hint">Values are saved against this date. If the report prints a different collection date you will see a note to check.</p>
+          <label class="dropzone" id="dropzone">
+            <input id="labFile" type="file" accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" />
+            <span class="upload-icon">⇧</span>
+            <strong id="dropzoneLabel">Choose a lab report</strong>
+            <small>PDF, image, text or CSV · up to 10 MB · synthetic data only</small>
+          </label>
+          <div class="ai-note" id="aiNote"><span>AI</span><p><strong id="aiStatusLine">Checking AI extraction…</strong> Values are read into an unverified queue and stay out of trends and CTCAE grading until you confirm each one. <button type="button" class="text-button" data-action="ai-settings">AI settings</button></p></div>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit">Extract values</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toxicity -->
+    <div class="modal" id="toxicityModal" role="dialog" aria-modal="true" aria-labelledby="toxicityModalTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card large">
+        <div class="modal-heading"><div><p class="eyebrow">Clinician-confirmed capture</p><h2 id="toxicityModalTitle">Record CTCAE toxicity</h2></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="toxicityForm" novalidate>
+          <div class="form-grid">
+            <label class="field"><span>Assessed before cycle</span><select name="cycle_id" class="cycle-window-select" required></select></label>
+            <label class="field"><span>Onset date</span><input type="date" name="onset_date" required /></label>
+            <label class="field span-2"><span>Describe the symptom (optional search aid)</span><input name="description" id="symptomDescription" maxlength="200" placeholder="e.g. tingling in fingertips, ringing in ears" autocomplete="off" /></label>
+          </div>
+          <div id="termSuggestions" class="term-suggestions"></div>
+          <label class="field"><span>CTCAE term</span><select id="toxicityTerm" name="ctcae_term" required></select></label>
+          <div class="criteria-panel"><div class="criteria-heading"><strong>Stored CTCAE grading criteria</strong><span id="criteriaAssoc">Reference data · not generated</span></div><div id="criteriaList" class="criteria-list"></div></div>
+          <fieldset class="grade-picker"><legend>Clinician-confirmed grade</legend><div id="gradeOptions"></div></fieldset>
+          <div class="form-grid">
+            <label class="field"><span>Status</span><select name="status"><option value="ongoing">Ongoing</option><option value="improving">Improving</option><option value="resolved">Resolved</option></select></label>
+            <label class="field"><span>Resolution date</span><input type="date" name="resolution_date" /></label>
+            <label class="field"><span>Suspected drug</span><select name="suspected_drug" id="suspectedDrug"></select></label>
+            <label class="field"><span>Confirmed by</span><input name="confirmed_by" value="" maxlength="80" required /></label>
+          </div>
+          <label class="field"><span>Clinical notes</span><textarea name="note" rows="2" maxlength="1000" placeholder="Relevant symptoms, examination or context"></textarea></label>
+          <label class="confirm-check"><input type="checkbox" name="confirmed" required /><span>I reviewed the displayed CTCAE criteria and confirm this grade.</span></label>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button danger-outline hidden" type="button" data-action="delete-symptom">Delete</button><span class="spacer"></span><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit">Save confirmed toxicity</button></div>
+        </form>
+      </div>
+    </div>
+
+
+    <!-- AI settings -->
+    <div class="modal" id="aiModal" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card">
+        <div class="modal-heading"><div><p class="eyebrow">Document AI</p><h2 id="aiModalTitle">AI lab report extraction</h2><p class="muted" id="aiModalStatus"></p></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="aiForm" novalidate>
+          <p class="muted">Uploaded PDFs, photos and scans are sent to the Claude API to read test names, values, units, reference ranges and the collection date. The key is stored only in this project's <code>.env</code> file on your computer and is never shown again.</p>
+          <label class="field"><span>Anthropic API key</span><input type="password" name="api_key" autocomplete="off" placeholder="sk-ant-…" /></label>
+          <label class="field"><span>Model</span><select name="model"><option value="claude-sonnet-5">Claude Sonnet 5 (recommended accuracy)</option><option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (faster, lower cost)</option><option value="claude-opus-5-5">Claude Opus 5.5 (highest accuracy)</option></select></label>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit">Test and save</button></div>
+        </form>
+      </div>
+    </div>
+    <!-- Confirm -->
+    <div class="modal" id="confirmModal" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card small-card">
+        <h2 id="confirmTitle">Are you sure?</h2>
+        <p id="confirmBody" class="muted"></p>
+        <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button danger" type="button" id="confirmOk">Delete</button></div>
+      </div>
+    </div>
+
+    <div id="chartTooltip" class="chart-tooltip" hidden></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,344 @@
+{
+ "drug": "Carboplatin",
+ "setid": "4c89cedc-e48b-445c-ad05-54dbe60e4fb0",
+ "title": "CARBOPLATIN INJECTION, SOLUTION [NATCO PHARMA USA LLC]",
+ "spl_version": 1,
+ "published_date": "2026-08-04",
+ "url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=4c89cedc-e48b-445c-ad05-54dbe60e4fb0",
+ "fetched_at": "2026-09-26T09:34:28+00:00",
+ "sections": {
+  "Boxed Warning": 724,
+  "Warnings": 3673,
+  "Adverse Reactions": 9335
+ },
+ "terms": {
+  "Nausea": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "nausea",
+     "text": "\u20263 82 21 Leukopenia <4,000 cells/mm 3 97 85 <2,000 cells/mm 3 71 26 Anemia <11 g/d L 90 90 <8g/d L 14 21 Infections 16 5 Bleeding 8 5 Transfusions 35 44 Gastrointestinal Nausea and vomiting 93 92 Vomiting 83 81 Other GI side effects 46 21 Neurologic Peripheral neuropathies 15 6 Ototoxicity 12 1 Other sensory side effects 5 1 Central neurotoxici\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Vomiting": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "vomiting",
+     "text": "Vomiting is another frequent drug related side effect."
+    },
+    {
+     "section": "Warnings",
+     "phrase": "emesis",
+     "text": "Carboplatin can induce emesis, which can be more severe in patients previously receiving emetogenic therapy."
+    }
+   ],
+   "boxed": true
+  },
+  "Diarrhea": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "diarrhea",
+     "text": "Other gastrointestinal effects observed frequently were pain, in 17% of the patients; diarrhea, in 6%;\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Constipation": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "constipation",
+     "text": "Other gastrointestinal effects observed frequently were pain, in 17% of the patients; diarrhea, in 6%; and constipation, also in 6%."
+    }
+   ],
+   "boxed": false
+  },
+  "Mucositis oral": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "stomatitis",
+     "text": "Malaise, anorexia, hypertension, dehydration, and stomatitis have been reported as part of postmarketing surveillance."
+    }
+   ],
+   "boxed": false
+  },
+  "Anorexia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "anorexia",
+     "text": "Malaise, anorexia, hypertension, dehydration, and stomatitis have been reported as part of postmarketing surveillance."
+    }
+   ],
+   "boxed": false
+  },
+  "Fatigue": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "asthenia",
+     "text": "\u20265 SGOT elevations 20 19 Alkaline phosphatase elevations 29 37 Electrolytes loss Sodium 10 47 Potassium 16 28 Calcium 16 31 Magnesium 61 43 Other side effects Pain 44 23 Asthenia 41 11 Cardiovascular 19 6 Respiratory 10 6 Allergic 11 2 Genitourinary 10 2 Alopecia 49 2 Mucositis 8 1 * Use with Cyclophosphamide for Initial Treatment of Ovarian Canc\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Fever": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "fever",
+     "text": "Fever has also been reported in patients with neutropenia."
+    }
+   ],
+   "boxed": false
+  },
+  "Infusion related reaction": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "anaphylactic",
+     "text": "Anaphylactic-like reactions to carboplatin have been reported and may occur within minutes of carboplatin injection administration."
+    },
+    {
+     "section": "Warnings",
+     "phrase": "anaphylaxis",
+     "text": "There is increased risk of allergic reactions including anaphylaxis in patients previously exposed to platinum therapy."
+    }
+   ],
+   "boxed": true
+  },
+  "Peripheral sensory neuropathy": {
+   "sections": [
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings",
+     "phrase": "neurotoxicity",
+     "text": "Although peripheral neurotoxicity is infrequent, its incidence is increased in patients older than 65 years and in patients previously treated with cisplatin."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "neurotoxicity",
+     "text": "\u2026inal Nausea and vomiting 93 92 Vomiting 83 81 Other GI side effects 46 21 Neurologic Peripheral neuropathies 15 6 Ototoxicity 12 1 Other sensory side effects 5 1 Central neurotoxicity 26 5 Renal Serum creatinine elevations 6 10 Blood urea elevations 17 22 Hepatic Bilirubin elevations 5 5 SGOT elevations 20 19 Alkaline phosphatase elevations 29 37 Elec\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Hearing impaired": {
+   "sections": [
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings",
+     "phrase": "hearing loss",
+     "text": "Clinically significant hearing loss has been reported to occur in pediatric patients when carboplatin was administered at higher than recommended doses in combination with other ototoxic agents."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "ototoxicity",
+     "text": "\u2026ctions 16 5 Bleeding 8 5 Transfusions 35 44 Gastrointestinal Nausea and vomiting 93 92 Vomiting 83 81 Other GI side effects 46 21 Neurologic Peripheral neuropathies 15 6 Ototoxicity 12 1 Other sensory side effects 5 1 Central neurotoxicity 26 5 Renal Serum creatinine elevations 6 10 Blood urea elevations 17 22 Hepatic Bilirubin elevations 5 5 SGOT e\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Alopecia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "alopecia",
+     "text": "\u2026um 10 47 Potassium 16 28 Calcium 16 31 Magnesium 61 43 Other side effects Pain 44 23 Asthenia 41 11 Cardiovascular 19 6 Respiratory 10 6 Allergic 11 2 Genitourinary 10 2 Alopecia 49 2 Mucositis 8 1 * Use with Cyclophosphamide for Initial Treatment of Ovarian Cancer: Data are based on the experience of 393 patients with ovarian cancer (regardless\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Rash maculo-papular": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "rash",
+     "text": "These allergic reactions have been similar in nature and severity to those reported with other platinum-containing compounds, ie, rash, urticaria, erythema, pruritus, and rarely bronchospasm and hypotension."
+    }
+   ],
+   "boxed": false
+  },
+  "Creatinine increased": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "nephrotoxicity",
+     "text": "Nephrotoxicity Development of abnormal renal function test results is uncommon, despite the fact that carboplatin, unlike cisplatin, has usually been administered without high-volume f\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Neutrophil count decreased": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "bone marrow suppression",
+     "text": "Bone marrow suppression is dose related and may be severe, resulting in infection and/or bleeding."
+    },
+    {
+     "section": "Warnings",
+     "phrase": "neutropenia",
+     "text": "\u2026ARNINGS Bone marrow suppression (leukopenia, neutropenia, and thrombocytopenia) is dose-dependent and is also the dose-limiting toxicity."
+    }
+   ],
+   "boxed": true
+  },
+  "Platelet count decreased": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "bone marrow suppression",
+     "text": "Bone marrow suppression is dose related and may be severe, resulting in infection and/or bleeding."
+    },
+    {
+     "section": "Warnings",
+     "phrase": "thrombocytopenia",
+     "text": "\u2026ARNINGS Bone marrow suppression (leukopenia, neutropenia, and thrombocytopenia) is dose-dependent and is also the dose-limiting toxicity."
+    }
+   ],
+   "boxed": true
+  },
+  "White blood cell decreased": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "bone marrow suppression",
+     "text": "Bone marrow suppression is dose related and may be severe, resulting in infection and/or bleeding."
+    },
+    {
+     "section": "Warnings",
+     "phrase": "leukopenia",
+     "text": "\u2026ARNINGS Bone marrow suppression (leukopenia, neutropenia, and thrombocytopenia) is dose-dependent and is also the dose-limiting toxicity."
+    }
+   ],
+   "boxed": true
+  },
+  "Anemia": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "anemia",
+     "text": "Anemia may be cumulative and may require transfusion support."
+    },
+    {
+     "section": "Warnings",
+     "phrase": "anemia",
+     "text": "Since anemia is cumulative, transfusions may be needed during treatment with carboplatin, particularly in patients receiving prolonged therapy."
+    }
+   ],
+   "boxed": true
+  },
+  "Hypomagnesemia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "magnesium",
+     "text": "\u2026levations 17 22 Hepatic Bilirubin elevations 5 5 SGOT elevations 20 19 Alkaline phosphatase elevations 29 37 Electrolytes loss Sodium 10 47 Potassium 16 28 Calcium 16 31 Magnesium 61 43 Other side effects Pain 44 23 Asthenia 41 11 Cardiovascular 19 6 Respiratory 10 6 Allergic 11 2 Genitourinary 10 2 Alopecia 49 2 Mucositis 8 1 * Use with Cyclophos\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Blood bilirubin increased": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "bilirubin",
+     "text": "\u2026l neuropathies 15 6 Ototoxicity 12 1 Other sensory side effects 5 1 Central neurotoxicity 26 5 Renal Serum creatinine elevations 6 10 Blood urea elevations 17 22 Hepatic Bilirubin elevations 5 5 SGOT elevations 20 19 Alkaline phosphatase elevations 29 37 Electrolytes loss Sodium 10 47 Potassium 16 28 Calcium 16 31 Magnesium 61 43 Other side effect\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Alkaline phosphatase increased": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "alkaline phosphatase",
+     "text": "\u2026ory side effects 5 1 Central neurotoxicity 26 5 Renal Serum creatinine elevations 6 10 Blood urea elevations 17 22 Hepatic Bilirubin elevations 5 5 SGOT elevations 20 19 Alkaline phosphatase elevations 29 37 Electrolytes loss Sodium 10 47 Potassium 16 28 Calcium 16 31 Magnesium 61 43 Other side effects Pain 44 23 Asthenia 41 11 Cardiovascular 19 6 Respirator\u2026"
+    }
+   ],
+   "boxed": false
+  }
+ },
+ "source": "DailyMed (U.S. National Library of Medicine) structured product label"
+}

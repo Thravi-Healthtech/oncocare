@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Thravi OncoCare: chemotherapy cycle intelligence for oncologists and their patients." />
+    <meta name="theme-color" content="#123d3b" />
+    <title>Thravi OncoCare</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/home.css" />
+  </head>
+  <body>
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="/" aria-label="Thravi OncoCare home">
+          <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="9" /></svg></span>
+          <span><strong>Thravi</strong><small>OncoCare</small></span>
+        </a>
+        <nav class="nav-links" aria-label="Page sections">
+          <a href="#features">Features</a>
+          <a href="#workflow">How it works</a>
+          <a href="#patients">For patients</a>
+        </nav>
+        <div class="nav-actions">
+          <a class="btn ghost" href="/portal" data-role="patient">Patient sign in</a>
+          <a class="btn solid" href="/clinician" data-role="clinician">Clinician sign in</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="wrap hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">Chemotherapy cycle intelligence</p>
+            <h1>Every cycle reviewed with the full picture in view.</h1>
+            <p class="lede">OncoCare brings the chemo plan, CTCAE toxicities, lab trends and patient-reported symptoms onto one pre-cycle screen, so oncologists can review each patient faster and more consistently.</p>
+
+            <div class="role-cards" id="signin">
+              <a class="role-card clinician" href="/clinician">
+                <span class="role-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3v6a4 4 0 0 0 8 0V3" /><path d="M10 13v2a5 5 0 0 0 10 0v-2" /><circle cx="20" cy="11" r="2" /></svg></span>
+                <span class="role-text"><strong>I'm a clinician</strong><small id="clinicianHint">Plans, cycles, labs and CTCAE review</small></span>
+                <span class="arrow" aria-hidden="true">→</span>
+              </a>
+              <a class="role-card patient" href="/portal">
+                <span class="role-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 22l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z" /></svg></span>
+                <span class="role-text"><strong>I'm a patient</strong><small id="patientHint">View my plan and reports, tell my team how I feel</small></span>
+                <span class="arrow" aria-hidden="true">→</span>
+              </a>
+            </div>
+            <p class="fine">Sign in with your registered mobile number.</p>
+          </div>
+
+          <div class="hero-visual" aria-hidden="true">
+            <div class="mock">
+              <div class="mock-head">
+                <div><span class="mock-label">Pre-cycle review</span><strong>Cycle 3 · Cisplatin 40 mg/m²</strong></div>
+                <span class="pill amber">2 flags</span>
+              </div>
+              <div class="mock-row">
+                <span>Creatinine</span>
+                <svg class="spark" viewBox="0 0 120 32"><polyline points="2,26 40,22 80,14 118,6" /><circle cx="118" cy="6" r="3" /></svg>
+                <span class="val up">1.4 <small>↑ 56% from baseline</small></span>
+              </div>
+              <div class="mock-row">
+                <span>ANC</span>
+                <svg class="spark" viewBox="0 0 120 32"><polyline points="2,8 40,14 80,20 118,18" /><circle cx="118" cy="18" r="3" /></svg>
+                <span class="val">1.6 <small>G1 · ×10⁹/L</small></span>
+              </div>
+              <div class="mock-row">
+                <span>Magnesium</span>
+                <svg class="spark" viewBox="0 0 120 32"><polyline points="2,10 40,12 80,16 118,22" /><circle cx="118" cy="22" r="3" /></svg>
+                <span class="val down">0.62 <small>below range</small></span>
+              </div>
+              <div class="mock-sep"></div>
+              <div class="mock-tox">
+                <span class="grade g2">G2</span><span>Peripheral sensory neuropathy</span><span class="src">patient · 24 Sep</span>
+              </div>
+              <div class="mock-tox">
+                <span class="grade g1">G1</span><span>Tinnitus</span><span class="src">clinician</span>
+              </div>
+              <div class="mock-decisions">
+                <span>Proceed</span><span class="active">Modify dose</span><span>Delay</span><span>Hold</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="features">
+        <div class="wrap">
+          <p class="eyebrow">Features</p>
+          <h2>Built around the chemotherapy cycle</h2>
+          <div class="features">
+            <article class="feature">
+              <span class="f-icon" aria-hidden="true">◎</span>
+              <h3>Chemo plans per patient</h3>
+              <p>Set the regimen, number of cycles and interval with multiple drugs and default doses, then adjust any individual cycle before it is saved.</p>
+            </article>
+            <article class="feature">
+              <span class="f-icon" aria-hidden="true">✓</span>
+              <h3>Cycle recording with reasons</h3>
+              <p>Record each cycle as given, modified, delayed, held or discontinued. Every change needs a reason, and the evidence behind it is kept with the decision.</p>
+            </article>
+            <article class="feature">
+              <span class="f-icon" aria-hidden="true">⇪</span>
+              <h3>AI lab report intake</h3>
+              <p>Upload CBP, LFT and RFT reports as PDF or photo. Claude extracts the values, which are cross-checked and confirmed by the clinician. Missing pre-cycle labs are marked.</p>
+            </article>
+            <article class="feature">
+              <span class="f-icon" aria-hidden="true">⌁</span>
+              <h3>Lab trends and flags</h3>
+              <p>Every result is compared with baseline and the previous cycle. Flags cover crossed limits, rapid changes, rising CTCAE grades, KDIGO creatinine rises and projected crossings.</p>
+            </article>
+            <article class="feature">
+              <span class="f-icon" aria-hidden="true">▦</span>
+              <h3>CTCAE v6.0 grading</h3>
+              <p>Grade adverse events with CTCAE v6.0 terms. DailyMed drug labels add context on the known toxicities of each drug in the regimen.</p>
+            </article>
+            <article class="feature">
+              <span class="f-icon" aria-hidden="true">≋</span>
+              <h3>Longitudinal view</h3>
+              <p>Labs, toxicities, patient messages and decisions appear on a single timeline across cycles, with the reasoning shown next to each grade.</p>
+            </article>
+            <article class="feature">
+              <span class="f-icon" aria-hidden="true">✎</span>
+              <h3>Between-cycle review</h3>
+              <p>Symptoms reported by the patient appear in the right assessment window by date. Review a report and record it as a CTCAE toxicity in one step.</p>
+            </article>
+            <article class="feature">
+              <span class="f-icon" aria-hidden="true">⚑</span>
+              <h3>Red-flag triage</h3>
+              <p>Fever, bleeding, breathlessness and other red flags move a message to the top of the inbox, and the patient is told right away to call the team.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section alt" id="workflow">
+        <div class="wrap">
+          <p class="eyebrow">How it works</p>
+          <h2>From plan to decision, every cycle</h2>
+          <ol class="steps">
+            <li><span class="n">1</span><strong>Plan</strong><p>Create the regimen and review each cycle.</p></li>
+            <li><span class="n">2</span><strong>Capture</strong><p>Record toxicities between cycles, from the clinic or the patient.</p></li>
+            <li><span class="n">3</span><strong>Labs</strong><p>Upload or enter pre-cycle labs. Trends are computed from baseline.</p></li>
+            <li><span class="n">4</span><strong>Review</strong><p>See current and previous labs, flags and CTCAE grades together.</p></li>
+            <li><span class="n">5</span><strong>Decide</strong><p>Proceed, modify, delay, hold, change regimen or discontinue.</p></li>
+          </ol>
+          <div class="principle">
+            <strong>The oncologist makes the decision.</strong>
+            <span>OncoCare organises the information and highlights what changed. It never recommends a treatment, and AI suggestions always need clinician confirmation.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="patients">
+        <div class="wrap split">
+          <div>
+            <p class="eyebrow">For patients</p>
+            <h2>Stay in touch with your care team between cycles</h2>
+            <ul class="checks">
+              <li>See your treatment plan and upcoming cycle dates</li>
+              <li>View lab results after your team has checked them, with the original reports</li>
+              <li>Tell your team how you feel by speaking or typing, in English, Hindi, Telugu, Tamil, Kannada, Malayalam, Marathi or Bengali</li>
+              <li>Read replies from your team in the same place</li>
+            </ul>
+            <a class="btn solid lg" href="/portal">Patient sign in</a>
+          </div>
+          <div class="emergency">
+            <strong>Not for emergencies</strong>
+            <p>If you have a temperature of 38 °C or more, bleeding, trouble breathing, chest pain, confusion, or you can't keep fluids down, call your care team now or dial <a href="tel:112">112</a>.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot-inner">
+        <span>© 2026 Thravi OncoCare · Prototype with synthetic data</span>
+        <span><a href="/clinician">Clinician sign in</a> · <a href="/portal">Patient sign in</a></span>
+      </div>
+    </footer>
+
+    <script>
+      // If someone is already signed in, say so on the role card.
+      (async () => {
+        const check = async (url) => { try { const r = await fetch(url, { credentials: "same-origin" }); return r.ok ? await r.json() : null; } catch { return null; } };
+        const doc = await check("/api/auth/me");
+        const name = doc && (doc.data?.name || doc.data?.clinician?.name);
+        if (name) document.getElementById("clinicianHint").textContent = `Signed in as ${name} · continue`;
+        const pat = await check("/api/portal/me");
+        const first = pat && pat.data?.first_name;
+        if (first) document.getElementById("patientHint").textContent = `Signed in as ${first} · continue`;
+      })();
+    </script>
+  </body>
+</html>

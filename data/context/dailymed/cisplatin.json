@@ -1,0 +1,487 @@
+{
+ "drug": "Cisplatin",
+ "setid": "508496cb-3441-46b3-a4fe-e0d440e6adc6",
+ "title": "CISPLATIN INJECTION, POWDER, LYOPHILIZED, FOR SOLUTION [WG CRITICAL CARE, LLC]",
+ "spl_version": 4,
+ "published_date": "2026-07-06",
+ "url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=508496cb-3441-46b3-a4fe-e0d440e6adc6",
+ "fetched_at": "2026-09-26T09:51:42+00:00",
+ "sections": {
+  "Boxed Warning": 1908,
+  "Warnings and Precautions": 8771,
+  "Adverse Reactions": 3306
+ },
+ "terms": {
+  "Nausea": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "nausea",
+     "text": "\u2026ARNING: NEPHROTOXICITY, PERIPHERAL NEUROPATHY, NAUSEA AND VOMITING and MYELOSUPPRESSION."
+    },
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "nausea",
+     "text": "5.3 Nausea and Vomiting Cisplatin for injection is a highly emetogenic antineoplastic agent."
+    }
+   ],
+   "boxed": true
+  },
+  "Vomiting": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "vomiting",
+     "text": "\u2026ARNING: NEPHROTOXICITY, PERIPHERAL NEUROPATHY, NAUSEA AND VOMITING and MYELOSUPPRESSION."
+    },
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "vomiting",
+     "text": "5.3 Nausea and Vomiting Cisplatin for injection is a highly emetogenic antineoplastic agent."
+    }
+   ],
+   "boxed": true
+  },
+  "Diarrhea": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "diarrhea",
+     "text": "\u2026disorders: Optic neuritis, papilledema, cortical blindness, blurred vision, color blindness, retinal pigmentation Gastrointestinal disorders: Nausea, vomiting, anorexia, diarrhea, stomatitis, gastrointestinal perforation, pancreatitis, hiccups General disorders: Asthenia, malaise Hepatobiliary disorders: Elevations of aminotransferases, lactate d\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Mucositis oral": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "stomatitis",
+     "text": "\u2026Optic neuritis, papilledema, cortical blindness, blurred vision, color blindness, retinal pigmentation Gastrointestinal disorders: Nausea, vomiting, anorexia, diarrhea, stomatitis, gastrointestinal perforation, pancreatitis, hiccups General disorders: Asthenia, malaise Hepatobiliary disorders: Elevations of aminotransferases, lactate dehydrogenase\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Anorexia": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "anorexia",
+     "text": "Various degrees of vomiting, nausea, and/or anorexia may persist for up to 1 week after treatment."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "anorexia",
+     "text": "\u2026menon Eye disorders: Optic neuritis, papilledema, cortical blindness, blurred vision, color blindness, retinal pigmentation Gastrointestinal disorders: Nausea, vomiting, anorexia, diarrhea, stomatitis, gastrointestinal perforation, pancreatitis, hiccups General disorders: Asthenia, malaise Hepatobiliary disorders: Elevations of aminotransferases,\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Fatigue": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "asthenia",
+     "text": "\u2026retinal pigmentation Gastrointestinal disorders: Nausea, vomiting, anorexia, diarrhea, stomatitis, gastrointestinal perforation, pancreatitis, hiccups General disorders: Asthenia, malaise Hepatobiliary disorders: Elevations of aminotransferases, lactate dehydrogenase, and bilirubin;\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Fever": {
+   "sections": [
+    "Warnings and Precautions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "fever",
+     "text": "Fever and infection have been reported in patients with neutropenia."
+    }
+   ],
+   "boxed": false
+  },
+  "Edema limbs": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "edema",
+     "text": "Manifestations have included facial edema, wheezing, tachycardia, and hypotension."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "edema",
+     "text": "\u2026: Asthenia, malaise Hepatobiliary disorders: Elevations of aminotransferases, lactate dehydrogenase, and bilirubin; hepatic failure Hypersensitivity: Anaphylaxis, facial edema, wheezing, tachycardia, and hypotension Local Site Reactions: Tissue cellulitis, fibrosis, necrosis, pain, edema, and erythema Metabolism and nutrition disorders: Hypoma\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Infusion related reaction": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "anaphylaxis",
+     "text": "\u2026WARNINGS AND PRECAUTIONS \u2022 Hypersensitivity reactions: Anaphylaxis and death may occur;\u2026"
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "anaphylaxis",
+     "text": "\u2026ps General disorders: Asthenia, malaise Hepatobiliary disorders: Elevations of aminotransferases, lactate dehydrogenase, and bilirubin; hepatic failure Hypersensitivity: Anaphylaxis, facial edema, wheezing, tachycardia, and hypotension Local Site Reactions: Tissue cellulitis, fibrosis, necrosis, pain, edema, and erythema Metabolism and nutrition dis\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Peripheral sensory neuropathy": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "peripheral neuropathy",
+     "text": "\u2026ARNING: NEPHROTOXICITY, PERIPHERAL NEUROPATHY, NAUSEA AND VOMITING and MYELOSUPPRESSION."
+    },
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "peripheral neuropathy",
+     "text": "5.2 Peripheral Neuropathy Cisplatin for injection can cause dose-related peripheral neuropathy that becomes more severe with repeated courses of the drug."
+    }
+   ],
+   "boxed": true
+  },
+  "Hearing impaired": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "ototoxicity",
+     "text": "\u2026WARNINGS AND PRECAUTIONS \u2022 Hypersensitivity reactions: Anaphylaxis and death may occur; monitor for and treat accordingly ( 5.5 ) \u2022 Ototoxicity: Cumulative toxicity may be severe particularly in pediatric patients;\u2026"
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "ototoxicity",
+     "text": "\u2026ng [see Warnings and Precautions ( 5.3 )] \u2022 Myelosuppression [see Warnings and Precautions ( 5.4 )] \u2022 Hypersensitivity reactions [see Warnings and Precautions ( 5.5 )] \u2022 Ototoxicity [see Warnings and Precautions ( 5.6 ] \u2022 Ocular toxicity [see Warnings and Precautions ( 5.7 )] \u2022 Secondary malignancies [see Warnings and Precautions ( 5.8 )] \u2022 Injectio\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Tinnitus": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "tinnitus",
+     "text": "Ototoxicity is manifested by tinnitus, hearing loss in the high frequency range (4,000 to 8,000 Hz) and/or decreased ability to hear normal conversational tones."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "tinnitus",
+     "text": "\u2026te\u2019s sign, dorsal column myelopathy, autonomic neuropathy, seizures, involuntary skeletal muscle contractions, tetany (with hypocalcemia and hypomagnesemia) Ototoxicity: Tinnitus, hearing loss, deafness, vestibular toxicity Renal and urinary disorders: Nephrotoxicity including renal failure, renal electrolyte wasting, azotemia, decreased creatini\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Alopecia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "alopecia",
+     "text": "\u2026asting, azotemia, decreased creatinine clearance Respiratory disorders: pneumonitis/interstitial lung disease, pulmonary embolism Skin and subcutaneous tissue disorders: Alopecia, rash Common adverse reactions are nephrotoxicity, peripheral neuropathy, nausea and vomiting, myelosuppression, and ototoxicity."
+    }
+   ],
+   "boxed": false
+  },
+  "Rash maculo-papular": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "rash",
+     "text": "\u2026otemia, decreased creatinine clearance Respiratory disorders: pneumonitis/interstitial lung disease, pulmonary embolism Skin and subcutaneous tissue disorders: Alopecia, rash Common adverse reactions are nephrotoxicity, peripheral neuropathy, nausea and vomiting, myelosuppression, and ototoxicity."
+    }
+   ],
+   "boxed": false
+  },
+  "Acute kidney injury": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "acute renal failure",
+     "text": "\u2022 Nephrotoxicity: cisplatin for injection can cause severe renal toxicity, including acute renal failure."
+    },
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "acute renal failure",
+     "text": "( 5.9 , 8.1 , 8.3 ) 5.1 Nephrotoxicity Cisplatin for injection can cause dose-related nephrotoxicity, including acute renal failure that becomes more prolonged and severe with repeated courses of the drug."
+    }
+   ],
+   "boxed": true
+  },
+  "Chronic kidney disease": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "renal impairment",
+     "text": "Consider dose reductions or alternative treatments in patients with renal impairment [see Dosage and Administration ( 2.1 ) and Warnings and Precautions ( 5.1 )]."
+    },
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "renal impairment",
+     "text": "Patients with baseline renal impairment, geriatric patients, patients who are taking other nephrotoxic drugs, or patients who are not well hydrated may be more susceptible to nephrotoxicity [see Use in Specifi\u2026"
+    }
+   ],
+   "boxed": true
+  },
+  "Creatinine increased": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "nephrotoxicity",
+     "text": "\u2026ARNING: NEPHROTOXICITY, PERIPHERAL NEUROPATHY, NAUSEA AND VOMITING and MYELOSUPPRESSION."
+    },
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "nephrotoxicity",
+     "text": "( 5.9 , 8.1 , 8.3 ) 5.1 Nephrotoxicity Cisplatin for injection can cause dose-related nephrotoxicity, including acute renal failure that becomes more prolonged and severe with repeated courses of the drug."
+    }
+   ],
+   "boxed": true
+  },
+  "Pneumonitis": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "pneumonitis",
+     "text": "\u2026toxicity Renal and urinary disorders: Nephrotoxicity including renal failure, renal electrolyte wasting, azotemia, decreased creatinine clearance Respiratory disorders: pneumonitis/interstitial lung disease, pulmonary embolism Skin and subcutaneous tissue disorders: Alopecia, rash Common adverse reactions are nephrotoxicity, peripheral neuropathy,\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Neutrophil count decreased": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "myelosuppression",
+     "text": "\u2026ARNING: NEPHROTOXICITY, PERIPHERAL NEUROPATHY, NAUSEA AND VOMITING and MYELOSUPPRESSION."
+    },
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "neutropenia",
+     "text": "Fever and infection have been reported in patients with neutropenia."
+    }
+   ],
+   "boxed": true
+  },
+  "Platelet count decreased": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "myelosuppression",
+     "text": "\u2026ARNING: NEPHROTOXICITY, PERIPHERAL NEUROPATHY, NAUSEA AND VOMITING and MYELOSUPPRESSION."
+    },
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "myelosuppression",
+     "text": "5.4 Myelosuppression Myelosuppression suppression occurs in 25% to 30% of patients treated with cisplatin for injection."
+    }
+   ],
+   "boxed": true
+  },
+  "White blood cell decreased": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "myelosuppression",
+     "text": "\u2026ARNING: NEPHROTOXICITY, PERIPHERAL NEUROPATHY, NAUSEA AND VOMITING and MYELOSUPPRESSION."
+    },
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "myelosuppression",
+     "text": "5.4 Myelosuppression Myelosuppression suppression occurs in 25% to 30% of patients treated with cisplatin for injection."
+    }
+   ],
+   "boxed": true
+  },
+  "Anemia": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "myelosuppression",
+     "text": "\u2026ARNING: NEPHROTOXICITY, PERIPHERAL NEUROPATHY, NAUSEA AND VOMITING and MYELOSUPPRESSION."
+    },
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "myelosuppression",
+     "text": "5.4 Myelosuppression Myelosuppression suppression occurs in 25% to 30% of patients treated with cisplatin for injection."
+    }
+   ],
+   "boxed": true
+  },
+  "Hypomagnesemia": {
+   "sections": [
+    "Warnings and Precautions",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Warnings and Precautions",
+     "phrase": "magnesium",
+     "text": "Measure serum creatinine, blood urea nitrogen, creatinine clearance, and serum electrolytes including magnesium prior to initiating therapy, and as clinically indicated."
+    },
+    {
+     "section": "Adverse Reactions",
+     "phrase": "hypomagnesemia",
+     "text": "\u2026edema, wheezing, tachycardia, and hypotension Local Site Reactions: Tissue cellulitis, fibrosis, necrosis, pain, edema, and erythema Metabolism and nutrition disorders: Hypomagnesemia, often requiring magnesium supplementation;\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Hypokalemia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "hypokalemia",
+     "text": "\u2026etabolism and nutrition disorders: Hypomagnesemia, often requiring magnesium supplementation; hyperuricemia, other electrolyte abnormalities (hypocalcemia, hyponatremia, hypokalemia, and hypophosphatemia), Syndrome of Inappropriate Antidiuretic Hormone Excretion (SIADH), dehydration, tumor lysis syndrome, increased serum amylase Musculoskeletal diso\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Hyponatremia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "hyponatremia",
+     "text": "\u2026and erythema Metabolism and nutrition disorders: Hypomagnesemia, often requiring magnesium supplementation; hyperuricemia, other electrolyte abnormalities (hypocalcemia, hyponatremia, hypokalemia, and hypophosphatemia), Syndrome of Inappropriate Antidiuretic Hormone Excretion (SIADH), dehydration, tumor lysis syndrome, increased serum amylase Musculo\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Hypocalcemia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "hypocalcemia",
+     "text": "\u2026pain, edema, and erythema Metabolism and nutrition disorders: Hypomagnesemia, often requiring magnesium supplementation; hyperuricemia, other electrolyte abnormalities (hypocalcemia, hyponatremia, hypokalemia, and hypophosphatemia), Syndrome of Inappropriate Antidiuretic Hormone Excretion (SIADH), dehydration, tumor lysis syndrome, increased serum a\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Hyperuricemia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "hyperuricemia",
+     "text": "\u2026eactions: Tissue cellulitis, fibrosis, necrosis, pain, edema, and erythema Metabolism and nutrition disorders: Hypomagnesemia, often requiring magnesium supplementation; hyperuricemia, other electrolyte abnormalities (hypocalcemia, hyponatremia, hypokalemia, and hypophosphatemia), Syndrome of Inappropriate Antidiuretic Hormone Excretion (SIADH), dehyd\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Blood bilirubin increased": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "bilirubin",
+     "text": "\u2026rointestinal perforation, pancreatitis, hiccups General disorders: Asthenia, malaise Hepatobiliary disorders: Elevations of aminotransferases, lactate dehydrogenase, and bilirubin;\u2026"
+    }
+   ],
+   "boxed": false
+  }
+ },
+ "source": "DailyMed (U.S. National Library of Medicine) structured product label"
+}

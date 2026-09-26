@@ -1,0 +1,429 @@
+{
+ "drug": "Paclitaxel",
+ "setid": "e4be6cbf-72b9-4f7f-9b1b-459b2d35961a",
+ "title": "PACLITAXEL INJECTION, SOLUTION, CONCENTRATE [TEVA PARENTERAL MEDICINES, INC.]",
+ "spl_version": 12,
+ "published_date": "2026-09-10",
+ "url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=e4be6cbf-72b9-4f7f-9b1b-459b2d35961a",
+ "fetched_at": "2026-09-26T10:37:04+00:00",
+ "sections": {
+  "Boxed Warning": 1352,
+  "Warnings": 2571,
+  "Adverse Reactions": 33203
+ },
+ "terms": {
+  "Nausea": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "nausea",
+     "text": "\u2026normal baseline (n = 559) 14 \u2022 Peripheral Neuropathy \u2014Any symptoms 60 \u2014Severe symptoms \u2020 3 \u2022 Myalgia/Arthralgia \u2014Any symptoms 60 \u2014Severe symptoms \u2020 8 \u2022 Gastrointestinal \u2014Nausea and vomiting 52 \u2014Diarrhea 38 \u2014Mucositis 31 \u2022 Alopecia 87 \u2022 Hepatic (Pts with normal baseline and on study data) \u2014Bilirubin elevations (n = 765) 7 \u2014Alkaline phosphatase e\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Vomiting": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "vomiting",
+     "text": "\u2026line (n = 559) 14 \u2022 Peripheral Neuropathy \u2014Any symptoms 60 \u2014Severe symptoms \u2020 3 \u2022 Myalgia/Arthralgia \u2014Any symptoms 60 \u2014Severe symptoms \u2020 8 \u2022 Gastrointestinal \u2014Nausea and vomiting 52 \u2014Diarrhea 38 \u2014Mucositis 31 \u2022 Alopecia 87 \u2022 Hepatic (Pts with normal baseline and on study data) \u2014Bilirubin elevations (n = 765) 7 \u2014Alkaline phosphatase elevations (n\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Diarrhea": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "diarrhea",
+     "text": "\u2026) 14 \u2022 Peripheral Neuropathy \u2014Any symptoms 60 \u2014Severe symptoms \u2020 3 \u2022 Myalgia/Arthralgia \u2014Any symptoms 60 \u2014Severe symptoms \u2020 8 \u2022 Gastrointestinal \u2014Nausea and vomiting 52 \u2014Diarrhea 38 \u2014Mucositis 31 \u2022 Alopecia 87 \u2022 Hepatic (Pts with normal baseline and on study data) \u2014Bilirubin elevations (n = 765) 7 \u2014Alkaline phosphatase elevations (n = 575) 22 \u2014AS\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Constipation": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "constipation",
+     "text": "Intestinal obstruction, intestinal perforation, pancreatitis, ischemic colitis, dehydration, esophagitis, constipation, and ascites have been reported."
+    }
+   ],
+   "boxed": false
+  },
+  "Mucositis oral": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "mucositis",
+     "text": "\u2026eral Neuropathy \u2014Any symptoms 60 \u2014Severe symptoms \u2020 3 \u2022 Myalgia/Arthralgia \u2014Any symptoms 60 \u2014Severe symptoms \u2020 8 \u2022 Gastrointestinal \u2014Nausea and vomiting 52 \u2014Diarrhea 38 \u2014Mucositis 31 \u2022 Alopecia 87 \u2022 Hepatic (Pts with normal baseline and on study data) \u2014Bilirubin elevations (n = 765) 7 \u2014Alkaline phosphatase elevations (n = 575) 22 \u2014AST (SGOT) eleva\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Anorexia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "anorexia",
+     "text": "Conjunctivitis, increased lacrimation, anorexia, confusional state, photopsia, visual floaters, vertigo, and increase in blood creatinine have been reported."
+    }
+   ],
+   "boxed": false
+  },
+  "Fatigue": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "asthenia",
+     "text": "\u202618 24 10 11 \u2022 Myalgia/Arthralgia \u2014Any symptoms 60 d 27 d 9 d 2 d \u2014Severe symptoms \u2020 6 d 1 d 1 \u2014 \u2022 Diarrhea \u2014Any symptoms 37 d 29 d 16 d 8 d \u2014Severe symptoms \u2020 2 3 4 1 \u2022 Asthenia \u2014Any symptoms NC NC 17 d 10 d \u2014Severe symptoms \u2020 NC NC 1 1 \u2022 Alopecia \u2014Any symptoms 96 d 89 d 55 d 37 d \u2014Severe symptoms \u2020 51 d 21 d 6 8 a Based on worst course analysis\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Fever": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "fever",
+     "text": "\u2026llowed by T d (n = 1570) \u2022 Bone Marrow e \u2014Neutropenia < 500/mm 3 79 76 48 50 \u2014Thrombocytopenia < 50,000/mm 3 27 25 11 11 \u2014Anemia < 8 g/dL 17 21 8 8 \u2014Infections 6 14 5 6 \u2014Fever Without Infection \u2014 3 < 1 1 \u2022 Hypersensitivity Reaction f 1 4 1 2 \u2022 Cardiovascular Events 1 2 1 2 \u2022 Neuromotor Toxicity 1 1 < 1 1 \u2022 Neurosensory Toxicity \u2014 3 < 1 3 \u2022 Mya\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Edema limbs": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "edema",
+     "text": "Edema was reported in 21% of all patients (17% of those without baseline edema);\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Infusion related reaction": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "anaphylaxis",
+     "text": "Anaphylaxis and severe hypersensitivity reactions characterized by dyspnea and hypotension requiring treatment, angioedema, and generalized urticaria have occurred in 2 to 4% of pat\u2026"
+    },
+    {
+     "section": "Warnings",
+     "phrase": "anaphylaxis",
+     "text": "\u2026ARNINGS Anaphylaxis and severe hypersensitivity reactions characterized by dyspnea and hypotension requiring treatment, angioedema, and generalized urticaria have occurred in 2 to 4% of pat\u2026"
+    }
+   ],
+   "boxed": true
+  },
+  "Febrile neutropenia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "febrile neutropenia",
+     "text": "\u20263 d 81 d 58 d \u2014Thrombocytopenia < 100,000/mm 3e 21 d 33 d 26 30 < 50,000/mm 3 3 d 7 d 10 9 \u2014Anemia < 11 g/dL f 96 97 88 86 < 8 g/dL 3 d 8 d 13 9 \u2014Infections 25 27 21 15 \u2014Febrile Neutropenia 4 7 15 d 4 d \u2022 Hypersensitivity Reaction \u2014All 11 d 6 d 8 d,g 1 d,g \u2014Severe \u2020 1 1 3 d,g \u2014 d,g \u2022 Neurotoxicity h \u2014Any symptoms 87 d 52 d 25 20 \u2014Severe symptoms \u2020 21 d 2 d\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Peripheral sensory neuropathy": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "peripheral neuropathy",
+     "text": "\u2026ign Changes c \u2014Bradycardia (n = 537) 3 \u2014Hypotension (n = 532) 12 \u2014Significant Cardiovascular Events 1 \u2022 Abnormal ECG \u2014All Pts 23 \u2014Pts with normal baseline (n = 559) 14 \u2022 Peripheral Neuropathy \u2014Any symptoms 60 \u2014Severe symptoms \u2020 3 \u2022 Myalgia/Arthralgia \u2014Any symptoms 60 \u2014Severe symptoms \u2020 8 \u2022 Gastrointestinal \u2014Nausea and vomiting 52 \u2014Diarrhea 38 \u2014Mucositis 31 \u2022\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Hearing impaired": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "ototoxicity",
+     "text": "Postmarketing reports of ototoxicity (hearing loss and tinnitus) have also been received."
+    }
+   ],
+   "boxed": false
+  },
+  "Tinnitus": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "tinnitus",
+     "text": "Postmarketing reports of ototoxicity (hearing loss and tinnitus) have also been received."
+    }
+   ],
+   "boxed": false
+  },
+  "Alopecia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "alopecia",
+     "text": "\u2026\u2014Any symptoms 60 \u2014Severe symptoms \u2020 3 \u2022 Myalgia/Arthralgia \u2014Any symptoms 60 \u2014Severe symptoms \u2020 8 \u2022 Gastrointestinal \u2014Nausea and vomiting 52 \u2014Diarrhea 38 \u2014Mucositis 31 \u2022 Alopecia 87 \u2022 Hepatic (Pts with normal baseline and on study data) \u2014Bilirubin elevations (n = 765) 7 \u2014Alkaline phosphatase elevations (n = 575) 22 \u2014AST (SGOT) elevations (n = 591\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Rash maculo-papular": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "rash",
+     "text": "The minor hypersensitivity reactions consisted mostly of flushing (28%), rash (12%), hypotension (4%), dyspnea (2%), tachycardia (2%), and hypertension (1%)."
+    }
+   ],
+   "boxed": false
+  },
+  "Myalgia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "myalgia",
+     "text": "\u202612 \u2014Significant Cardiovascular Events 1 \u2022 Abnormal ECG \u2014All Pts 23 \u2014Pts with normal baseline (n = 559) 14 \u2022 Peripheral Neuropathy \u2014Any symptoms 60 \u2014Severe symptoms \u2020 3 \u2022 Myalgia/Arthralgia \u2014Any symptoms 60 \u2014Severe symptoms \u2020 8 \u2022 Gastrointestinal \u2014Nausea and vomiting 52 \u2014Diarrhea 38 \u2014Mucositis 31 \u2022 Alopecia 87 \u2022 Hepatic (Pts with normal baseline\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Arthralgia": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "arthralgia",
+     "text": "\u2026ificant Cardiovascular Events 1 \u2022 Abnormal ECG \u2014All Pts 23 \u2014Pts with normal baseline (n = 559) 14 \u2022 Peripheral Neuropathy \u2014Any symptoms 60 \u2014Severe symptoms \u2020 3 \u2022 Myalgia/Arthralgia \u2014Any symptoms 60 \u2014Severe symptoms \u2020 8 \u2022 Gastrointestinal \u2014Nausea and vomiting 52 \u2014Diarrhea 38 \u2014Mucositis 31 \u2022 Alopecia 87 \u2022 Hepatic (Pts with normal baseline and on stud\u2026"
+    }
+   ],
+   "boxed": false
+  },
+  "Acute kidney injury": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "renal failure",
+     "text": "Patients with gynecological cancers treated with paclitaxel and cisplatin may have an increased risk of renal failure with the combination therapy of paclitaxel and cisplatin in gynecological cancers as compared to cisplatin alone."
+    }
+   ],
+   "boxed": false
+  },
+  "Chronic kidney disease": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "renal insufficiency",
+     "text": "The other 4 patients had renal insufficiency with reversible elevations of serum creatinine."
+    }
+   ],
+   "boxed": false
+  },
+  "Creatinine increased": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "serum creatinine",
+     "text": "The other 4 patients had renal insufficiency with reversible elevations of serum creatinine."
+    }
+   ],
+   "boxed": false
+  },
+  "Ejection fraction decreased": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "ejection fraction",
+     "text": "Congestive heart failure, including cardiac dysfunction and reduction of left ventricular ejection fraction or ventricular failure, has been reported typically in patients who have received other chemotherapy, notably anthracyclines (see PRECAUTIONS, Drug Interactions )."
+    }
+   ],
+   "boxed": false
+  },
+  "Pneumonitis": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "pneumonitis",
+     "text": "Radiation pneumonitis has been reported in patients receiving concurrent radiotherapy."
+    }
+   ],
+   "boxed": false
+  },
+  "Neutrophil count decreased": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "neutropenia",
+     "text": "In order to monitor the occurrence of bone marrow suppression, primarily neutropenia, which may be severe and result in infection, it is recommended that frequent peripheral blood cell counts be performed on all patients receiving paclitaxel injection."
+    },
+    {
+     "section": "Warnings",
+     "phrase": "neutropenia",
+     "text": "Bone marrow suppression (primarily neutropenia) is dose-dependent and is the dose-limiting toxicity."
+    }
+   ],
+   "boxed": true
+  },
+  "Platelet count decreased": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "bone marrow suppression",
+     "text": "In order to monitor the occurrence of bone marrow suppression, primarily neutropenia, which may be severe and result in infection, it is recommended that frequent peripheral blood cell counts be performed on all patients receiving\u2026"
+    },
+    {
+     "section": "Warnings",
+     "phrase": "bone marrow suppression",
+     "text": "Bone marrow suppression (primarily neutropenia) is dose-dependent and is the dose-limiting toxicity."
+    }
+   ],
+   "boxed": true
+  },
+  "White blood cell decreased": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "bone marrow suppression",
+     "text": "In order to monitor the occurrence of bone marrow suppression, primarily neutropenia, which may be severe and result in infection, it is recommended that frequent peripheral blood cell counts be performed on all patients receiving\u2026"
+    },
+    {
+     "section": "Warnings",
+     "phrase": "bone marrow suppression",
+     "text": "Bone marrow suppression (primarily neutropenia) is dose-dependent and is the dose-limiting toxicity."
+    }
+   ],
+   "boxed": true
+  },
+  "Anemia": {
+   "sections": [
+    "Boxed Warning",
+    "Warnings",
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Boxed Warning",
+     "phrase": "bone marrow suppression",
+     "text": "In order to monitor the occurrence of bone marrow suppression, primarily neutropenia, which may be severe and result in infection, it is recommended that frequent peripheral blood cell counts be performed on all patients receiving\u2026"
+    },
+    {
+     "section": "Warnings",
+     "phrase": "bone marrow suppression",
+     "text": "Bone marrow suppression (primarily neutropenia) is dose-dependent and is the dose-limiting toxicity."
+    }
+   ],
+   "boxed": true
+  },
+  "Blood bilirubin increased": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "bilirubin",
+     "text": "\u2026ptoms 60 \u2014Severe symptoms \u2020 8 \u2022 Gastrointestinal \u2014Nausea and vomiting 52 \u2014Diarrhea 38 \u2014Mucositis 31 \u2022 Alopecia 87 \u2022 Hepatic (Pts with normal baseline and on study data) \u2014Bilirubin elevations (n = 765) 7 \u2014Alkaline phosphatase elevations (n = 575) 22 \u2014AST (SGOT) elevations (n = 591) 19 \u2022 Injection Site Reaction 13 a Based on worst course analysis."
+    }
+   ],
+   "boxed": false
+  },
+  "Alkaline phosphatase increased": {
+   "sections": [
+    "Adverse Reactions"
+   ],
+   "snippets": [
+    {
+     "section": "Adverse Reactions",
+     "phrase": "alkaline phosphatase",
+     "text": "\u2026strointestinal \u2014Nausea and vomiting 52 \u2014Diarrhea 38 \u2014Mucositis 31 \u2022 Alopecia 87 \u2022 Hepatic (Pts with normal baseline and on study data) \u2014Bilirubin elevations (n = 765) 7 \u2014Alkaline phosphatase elevations (n = 575) 22 \u2014AST (SGOT) elevations (n = 591) 19 \u2022 Injection Site Reaction 13 a Based on worst course analysis."
+    }
+   ],
+   "boxed": false
+  }
+ },
+ "source": "DailyMed (U.S. National Library of Medicine) structured product label"
+}

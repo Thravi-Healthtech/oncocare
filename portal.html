@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Thravi OncoCare patient portal" />
+    <meta name="theme-color" content="#123d3b" />
+    <title>My Care · Thravi OncoCare</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/portal.css" />
+  </head>
+  <body>
+    <!-- Sign in -->
+    <main id="loginView" class="login-view" hidden>
+      <div class="login-card">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="9" /></svg></span><span><strong>Thravi</strong><small>My care</small></span></div>
+        <h1>Welcome</h1>
+        <p class="muted">Sign in with the mobile number registered with your hospital.</p>
+        <form id="loginForm" novalidate>
+          <label class="field"><span>Mobile number</span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="e.g. 98765 43210" required /></label>
+          <label class="field"><span>Password</span><input name="password" type="password" autocomplete="current-password" required /></label>
+          <p class="form-error" role="alert" hidden></p>
+          <button class="button primary full" type="submit">Sign in</button>
+        </form>
+        <p class="fine-print">Can't sign in? Ask your oncology team to check your mobile number and portal access. Sign-in by OTP is coming soon. This portal is not for emergencies.</p>
+        <p class="fine-print"><a href="/">← Back to home</a></p>
+      </div>
+    </main>
+
+    <!-- App -->
+    <div id="appView" class="app" hidden>
+      <header class="top">
+        <div class="brand small"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="9" /></svg></span><span><strong>Thravi</strong><small>My care</small></span></div>
+        <div class="who"><strong id="patientName"></strong><small id="patientMrn"></small></div>
+        <button class="link-button" id="signOut" type="button">Sign out</button>
+      </header>
+
+      <nav class="tabs" aria-label="Portal sections">
+        <a href="#home" data-tab="home"><span aria-hidden="true">⌂</span>Home</a>
+        <a href="#plan" data-tab="plan"><span aria-hidden="true">◎</span>My plan</a>
+        <a href="#reports" data-tab="reports"><span aria-hidden="true">⌁</span>Lab reports</a>
+        <a href="#symptoms" data-tab="symptoms"><span aria-hidden="true">✎</span>Symptoms</a>
+      </nav>
+
+      <main class="content" id="content">
+        <section data-view="home" class="view">
+          <p class="eyebrow">Hello</p>
+          <h1 id="greeting">Welcome back</h1>
+          <div id="homeCards" class="stack"></div>
+        </section>
+
+        <section data-view="plan" class="view">
+          <p class="eyebrow">Your treatment</p>
+          <h1>My plan</h1>
+          <p class="muted">This is a view-only copy of the plan recorded by your care team. Ask them if anything looks different from what you were told.</p>
+          <div id="planContent" class="stack"></div>
+        </section>
+
+        <section data-view="reports" class="view">
+          <p class="eyebrow">Blood tests</p>
+          <h1>Lab reports</h1>
+          <p class="muted">Results appear here after your care team has checked them. "High" or "Low" means outside the lab's usual range — your doctor will tell you what it means for your treatment.</p>
+          <div id="reportsContent" class="stack"></div>
+        </section>
+
+        <section data-view="symptoms" class="view">
+          <p class="eyebrow" data-t="tellTeam">Tell your care team</p>
+          <h1 data-t="feelingTitle">How are you feeling?</h1>
+          <div class="emergency-note" role="note" data-t-html="emergencyNote"><strong>Not for emergencies.</strong> If you have a temperature of 38 °C or more, bleeding, trouble breathing, chest pain, confusion, or you can't keep fluids down, call your care team now or dial <a href="tel:112">112</a>.</div>
+
+          <div class="lang-switch" role="group" aria-label="Question language">
+            <span id="langLabel" data-t="langLabel">Language</span>
+            <button type="button" data-ui-lang="en" class="active">English</button>
+            <button type="button" data-ui-lang="hi">हिन्दी</button>
+            <button type="button" data-ui-lang="te">తెలుగు</button>
+          </div>
+
+          <form id="reportForm" class="card stack-sm" novalidate>
+            <p class="step-count" data-t="step1"></p>
+            <h2 class="step-title" data-t="describeTitle"></h2>
+            <div class="mode-switch" role="tablist" aria-label="How do you want to report">
+              <button type="button" role="tab" class="mode active" data-mode="voice" aria-selected="true" data-t="speak"></button>
+              <button type="button" role="tab" class="mode" data-mode="text" aria-selected="false" data-t="type"></button>
+            </div>
+
+            <div id="voicePanel" class="voice-panel">
+              <label class="field inline"><span data-t="speechLang"></span>
+                <select id="speechLang">
+                  <option value="en-IN">English (India)</option><option value="hi-IN">हिन्दी Hindi</option><option value="te-IN">తెలుగు Telugu</option>
+                  <option value="ta-IN">தமிழ் Tamil</option><option value="kn-IN">ಕನ್ನಡ Kannada</option><option value="ml-IN">മലയാളം Malayalam</option>
+                  <option value="mr-IN">मराठी Marathi</option><option value="bn-IN">বাংলা Bengali</option><option value="en-US">English (US)</option>
+                </select>
+              </label>
+              <button type="button" class="mic" id="micButton" aria-pressed="false"><span class="mic-dot"></span><span id="micLabel"></span></button>
+              <p class="muted small" id="voiceHint" data-t="voiceHint"></p>
+              <audio id="audioPreview" controls hidden></audio>
+              <label class="check"><input type="checkbox" id="attachAudio" checked /><span data-t="attachAudio"></span></label>
+            </div>
+
+            <label class="field"><span id="textLabel"></span><textarea name="text" id="reportText" rows="4" maxlength="4000"></textarea></label>
+            <p class="form-error" role="alert" hidden></p>
+            <button class="button primary full" type="submit" data-t="next"></button>
+            <button class="link-button center" type="button" id="pickFromList" data-t="pickFromList"></button>
+            <button class="link-button center" type="button" id="noSymptoms" data-t="noSymptoms"></button>
+          </form>
+
+          <div id="wizard" class="card stack-sm" hidden></div>
+
+          <div id="sentPanel"></div>
+          <h2 class="section-title" data-t="myMessages">My messages</h2>
+          <div id="reportHistory" class="stack"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/portal.js"></script>
+  </body>
+</html>

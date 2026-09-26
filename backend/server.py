@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+import argparse
+import os
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+
+
+def load_env(path: Path) -> None:
+    """Minimal .env loader (KEY=VALUE lines). Existing environment variables win."""
+    if not path.is_file():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_env(Path(os.environ.get("ONCOCARE_ENV_FILE", Path(__file__).resolve().parents[1] / ".env")))
+
+from .api import make_handler  # noqa: E402
+from .database import migrate, seed_demo  # noqa: E402
+from .extraction import ai_status  # noqa: E402
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Thravi OncoCare local API server")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=4173)
+    parser.add_argument("--db", default="data/oncocare.db")
+    parser.add_argument("--static-dir", default=str(Path(__file__).resolve().parents[1]))
+    parser.add_argument("--seed", action="store_true", help="Add the synthetic demo patients whose MRNs are missing")
+    args = parser.parse_args()
+
+    migrate(args.db)
+    if args.seed:
+        seed_demo(args.db)
+    handler = make_handler(args.db, args.static_dir)
+    server = ThreadingHTTPServer((args.host, args.port), handler)
+    print(f"Thravi OncoCare running at http://{args.host}:{args.port}")
+    print(f"Clinician app: http://{args.host}:{args.port}/clinician · Patient portal: http://{args.host}:{args.port}/portal")
+    print(f"API health: http://{args.host}:{args.port}/health")
+    status = ai_status()
+    print(f"AI lab extraction: {'ON (' + status['model'] + ')' if status['enabled'] else 'OFF - ' + status['hint']}")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()
+
