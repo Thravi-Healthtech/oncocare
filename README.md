@@ -173,3 +173,7 @@ python3 -m unittest discover -s tests -v
 - The CTCAE set covers the terms relevant to the seeded drugs, not the full dictionary. Hypokalemia and hyponatremia grades that depend on symptoms are flagged for clinician review. Liver grades assume a normal baseline and flag when it was not.
 - The drug → toxicity mapping is a curated shortlist and is not a causality assessment.
 - Scanned images need the Claude adapter (or manual entry). The rule-based parser only reads text layers.
+
+## Hosting (onco.thravi.in)
+
+See [deploy/aws/README.md](deploy/aws/README.md). Run `./deploy/aws/deploy.sh` to create or update the AWS deployment.

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import base64
 import binascii
+import html
 import json
 import math
 import mimetypes
+import os
 import re
 import sqlite3
 import uuid
@@ -151,6 +153,24 @@ def trend_payload(observations: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def public_mode() -> bool:
+    """ONCOCARE_PUBLIC=1 when the server is exposed on the internet behind HTTPS (e.g. onco.thravi.in)."""
+    return os.environ.get("ONCOCARE_PUBLIC", "").lower() in {"1", "true", "yes"}
+
+
+def cookie_attrs() -> str:
+    return "HttpOnly; SameSite=Strict" + ("; Secure" if public_mode() else "")
+
+
+def demo_banner_html() -> bytes:
+    text = os.environ.get("ONCOCARE_DEMO_BANNER", "").strip()
+    if not text:
+        return b""
+    safe = html.escape(text)
+    return (f'<div role="note" style="background:#7a2e00;color:#fff;text-align:center;padding:6px 12px;'
+            f'font:600 13px/1.4 system-ui,sans-serif;position:relative;z-index:9999">{safe}</div>').encode()
+
+
 def make_handler(db_path: str | Path, static_dir: str | Path | None = None, require_auth: bool = True) -> type[BaseHTTPRequestHandler]:
     database_path = str(db_path)
     upload_dir = Path(database_path).resolve().parent / "uploads" if database_path != ":memory:" else Path("uploads")
@@ -219,7 +239,7 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             except (json.JSONDecodeError, UnicodeDecodeError):
                 self._json(HTTPStatus.BAD_REQUEST, {"error": {"message": "Request body must be valid JSON"}})
             except Exception as error:  # pragma: no cover - defensive
-                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": {"message": "Unexpected server error", "details": {"type": type(error).__name__, "reason": str(error)}}})
+                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": {"message": "Unexpected server error", "details": {} if public_mode() else {"type": type(error).__name__, "reason": str(error)}}})
 
         # ------------------------------------------------------------------ routing
         def _route(self, method: str, path: str, query: dict[str, list[str]]) -> tuple[dict[str, Any], int]:
@@ -230,6 +250,8 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             if path == "/api/settings/ai" and method == "GET":
                 return {"data": ai_status()}, HTTPStatus.OK
             if path == "/api/settings/ai" and method == "POST":
+                if public_mode():
+                    raise ApiError(HTTPStatus.FORBIDDEN, "AI settings are managed by the server administrator on this deployment.")
                 body = self._body()
                 try:
                     return {"data": save_ai_settings(body.get("api_key"), body.get("model"))}, HTTPStatus.OK
@@ -1131,12 +1153,12 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                 body = self._body()
                 with transaction(database_path) as connection:
                     token, clinician = auth.login_clinician(connection, str(body.get("phone") or ""), str(body.get("password") or ""))
-                self._extra_headers.append(("Set-Cookie", f"{auth.DOCTOR_COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age={auth.SESSION_HOURS * 3600}"))
+                self._extra_headers.append(("Set-Cookie", f"{auth.DOCTOR_COOKIE}={token}; {cookie_attrs()}; Path=/; Max-Age={auth.SESSION_HOURS * 3600}"))
                 return {"data": clinician}, HTTPStatus.OK
             if path == "/api/auth/logout" and method == "POST":
                 with transaction(database_path) as connection:
                     auth.logout_clinician(connection, self._cookie(auth.DOCTOR_COOKIE))
-                self._extra_headers.append(("Set-Cookie", f"{auth.DOCTOR_COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"))
+                self._extra_headers.append(("Set-Cookie", f"{auth.DOCTOR_COOKIE}=; {cookie_attrs()}; Path=/; Max-Age=0"))
                 return {"data": {"signed_out": True}}, HTTPStatus.OK
             if path == "/api/auth/me" and method == "GET":
                 with transaction(database_path) as connection:
@@ -1158,12 +1180,12 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                 body = self._body()
                 with transaction(database_path) as connection:
                     token, me = portal.login(connection, str(body.get("phone") or ""), str(body.get("password") or ""))
-                self._extra_headers.append(("Set-Cookie", f"{PORTAL_COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age={portal.SESSION_HOURS * 3600}"))
+                self._extra_headers.append(("Set-Cookie", f"{PORTAL_COOKIE}={token}; {cookie_attrs()}; Path=/; Max-Age={portal.SESSION_HOURS * 3600}"))
                 return {"data": me}, HTTPStatus.OK
             if path == "/api/portal/logout" and method == "POST":
                 with transaction(database_path) as connection:
                     portal.logout(connection, self._cookie_token())
-                self._extra_headers.append(("Set-Cookie", f"{PORTAL_COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"))
+                self._extra_headers.append(("Set-Cookie", f"{PORTAL_COOKIE}=; {cookie_attrs()}; Path=/; Max-Age=0"))
                 return {"data": {"signed_out": True}}, HTTPStatus.OK
             patient_id = self._portal_patient()
             if path == "/api/portal/me" and method == "GET":
@@ -1314,6 +1336,11 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             if not target.is_file():
                 return self._json(404, {"error": {"message": "Not found"}})
             content = target.read_bytes()
+            banner = demo_banner_html() if target.suffix == ".html" else b""
+            if banner:
+                match = re.search(rb"<body[^>]*>", content)
+                if match:
+                    content = content[:match.end()] + banner + content[match.end():]
             self.send_response(200)
             self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
             self.send_header("Content-Length", str(len(content)))

@@ -34,6 +34,10 @@ def main() -> None:
     parser.add_argument("--seed", action="store_true", help="Add the synthetic demo patients whose MRNs are missing")
     args = parser.parse_args()
 
+    if os.environ.get("ONCOCARE_PUBLIC", "").lower() in {"1", "true", "yes"}:
+        password = os.environ.get("ONCOCARE_DEV_PASSWORD", "")
+        if len(password) < 10 or password == "1234":
+            raise SystemExit("ONCOCARE_PUBLIC is set: ONCOCARE_DEV_PASSWORD must be set to a strong value (10+ characters).")
     migrate(args.db)
     if args.seed:
         seed_demo(args.db)
