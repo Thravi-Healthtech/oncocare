@@ -3,25 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Thravi OncoCare: chemotherapy cycle intelligence for oncologists and their patients." />
+    <meta name="description" content="Thravi OncoCare (beta): assistive AI that brings radiology, pathology, surgery, chemotherapy, radiation and follow-up into one record for oncology teams and their patients." />
     <meta name="theme-color" content="#123d3b" />
-    <title>Thravi OncoCare</title>
+    <title>Thravi OncoCare · Beta</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/home.css" />
   </head>
   <body>
+    <div class="beta-bar" role="note">
+      <div class="wrap beta-inner">
+        <span class="beta-tag">Beta</span>
+        <span class="beta-text">OncoCare is in beta. The chemotherapy module is live with synthetic patients only; the other workflows and integrations below are on our roadmap.</span>
+        <a class="beta-link" href="#workflows">See what's live →</a>
+      </div>
+    </div>
+
     <header class="nav">
       <div class="wrap nav-inner">
         <a class="brand" href="/" aria-label="Thravi OncoCare home">
           <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="9" /></svg></span>
-          <span><strong>Thravi</strong><small>OncoCare</small></span>
+          <span><strong>Thravi</strong><small>OncoCare <em>beta</em></small></span>
         </a>
         <nav class="nav-links" aria-label="Page sections">
-          <a href="#features">Features</a>
-          <a href="#workflow">How it works</a>
-          <a href="#patients">For patients</a>
+          <a href="#journey">Journey</a>
+          <a href="#workflows">Workflows</a>
+          <a href="#integrations">Integrations</a>
+          <a href="#ai">AI</a>
+          <a href="#chemo">Chemotherapy</a>
+          <a href="#patients">Patients</a>
         </nav>
         <div class="nav-actions">
           <a class="btn ghost" href="/portal" data-role="patient">Patient sign in</a>
@@ -31,12 +42,16 @@
     </header>
 
     <main>
+      <!-- Hero -->
       <section class="hero">
         <div class="wrap hero-grid">
           <div class="hero-copy">
-            <p class="eyebrow">Chemotherapy cycle intelligence</p>
-            <h1>Every cycle reviewed with the full picture in view.</h1>
-            <p class="lede">OncoCare brings the chemo plan, CTCAE toxicities, lab trends and patient-reported symptoms onto one pre-cycle screen, so oncologists can review each patient faster and more consistently.</p>
+            <a class="event-chip" href="https://healthathon.reskilll.com/" target="_blank" rel="noopener">
+              <span class="dot" aria-hidden="true"></span>Pitching at Health-a-thon 2026 · Cancer Care
+            </a>
+            <p class="eyebrow">Assistive AI for cancer care</p>
+            <h1>One record for every cancer patient, across every treatment.</h1>
+            <p class="lede">OncoCare brings radiology, pathology, surgery, chemotherapy, radiation and follow-up into one longitudinal view, with reports arriving from DICOM, labs, hospital systems and WhatsApp. AI organises and highlights what changed. The oncologist decides.</p>
 
             <div class="role-cards" id="signin">
               <a class="role-card clinician" href="/clinician">
@@ -50,11 +65,315 @@
                 <span class="arrow" aria-hidden="true">→</span>
               </a>
             </div>
-            <p class="fine">Sign in with your registered mobile number.</p>
+            <p class="fine">Sign in with your registered mobile number. Demo uses synthetic patients only.</p>
           </div>
 
           <div class="hero-visual" aria-hidden="true">
-            <div class="mock">
+            <div class="mock timeline-mock">
+              <div class="mock-head">
+                <div><span class="mock-label">Patient timeline</span><strong>Breast carcinoma · cT2 N1 M0</strong></div>
+                <span class="pill concept">Concept</span>
+              </div>
+              <ol class="tl">
+                <li class="m-rad"><span class="tl-date">02 Jul</span><span class="tl-kind">Radiology</span><span class="tl-body"><b>CT chest-abdomen-pelvis</b><small>Baseline · 3 target lesions, sum 54 mm</small></span><span class="tl-src">DICOM</span></li>
+                <li class="m-path"><span class="tl-date">09 Jul</span><span class="tl-kind">Pathology</span><span class="tl-body"><b>Core biopsy · IDC grade 2</b><small>ER+ PR+ HER2 1+ · Ki-67 30%</small></span><span class="tl-src">PDF · AI read</span></li>
+                <li class="m-mdt"><span class="tl-date">14 Jul</span><span class="tl-kind">Tumour board</span><span class="tl-body"><b>Neoadjuvant chemo → surgery → RT</b><small>Consensus recorded</small></span><span class="tl-src">MDT</span></li>
+                <li class="m-chemo"><span class="tl-date">26 Sep</span><span class="tl-kind">Chemo</span><span class="tl-body"><b>Cycle 4 · dose modified</b><small>ANC 1.1 ×10⁹/L · G2 neutropenia</small></span><span class="tl-src">Live</span></li>
+                <li class="m-pt"><span class="tl-date">29 Sep</span><span class="tl-kind">Patient</span><span class="tl-body"><b>Voice note in Telugu</b><small>Nausea for 3 days · suggested G2</small></span><span class="tl-src">WhatsApp</span></li>
+                <li class="m-rad"><span class="tl-date">01 Oct</span><span class="tl-kind">Radiology</span><span class="tl-body"><b>Interim CT · sum 38 mm</b><small>−30% from baseline · partial response</small></span><span class="tl-src">RECIST 1.1</span></li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Journey -->
+      <section class="section" id="journey">
+        <div class="wrap">
+          <p class="eyebrow">The problem</p>
+          <h2>Cancer care is spread across departments, centres and formats.</h2>
+          <p class="section-lede">A single patient's story lives in CT scans on a CD, pathology PDFs, handwritten op notes, lab photos and WhatsApp forwards. Oncologists rebuild it at every visit. OncoCare follows the patient through the whole journey and keeps it in one place.</p>
+          <ol class="journey">
+            <li><span class="j-n">01</span><strong>Referral &amp; screening</strong><p>Prior reports and scans imported on day one, ABHA-linked.</p></li>
+            <li><span class="j-n">02</span><strong>Diagnosis</strong><p>Imaging, biopsy, IHC and biomarkers read into structured data.</p></li>
+            <li><span class="j-n">03</span><strong>Tumour board</strong><p>Case brief assembled automatically; consensus plan recorded.</p></li>
+            <li><span class="j-n">04</span><strong>Treatment</strong><p>Surgery, chemo, radiation, targeted, immuno and hormonal therapy.</p></li>
+            <li><span class="j-n">05</span><strong>Response</strong><p>Scans compared over time, toxicities graded, decisions logged.</p></li>
+            <li><span class="j-n">06</span><strong>Follow-up</strong><p>Surveillance schedule, survivorship and palliative symptom care.</p></li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- Workflows -->
+      <section class="section alt" id="workflows">
+        <div class="wrap">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Workflows</p>
+              <h2>Built for every cancer treatment type</h2>
+            </div>
+            <div class="legend" aria-label="Status legend">
+              <span class="status live">Live in beta</span>
+              <span class="status next">Next up</span>
+              <span class="status planned">Planned</span>
+            </div>
+          </div>
+
+          <div class="workflows">
+            <article class="wf featured">
+              <div class="wf-top">
+                <span class="wf-icon c-chemo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v5l-5 9a3 3 0 0 0 2.6 4.5h8.8A3 3 0 0 0 19 17l-5-9V3" /><path d="M7.5 14h9" /></svg></span>
+                <span class="status live">Live in beta</span>
+              </div>
+              <h3>Chemotherapy</h3>
+              <ul>
+                <li>Multi-drug regimens with per-cycle doses</li>
+                <li>Pre-cycle labs from PDF or photo, with trends</li>
+                <li>CTCAE v6.0 toxicity grading between cycles</li>
+                <li>Proceed, modify, delay, hold or stop with reasons</li>
+              </ul>
+              <a class="wf-link" href="#chemo">See the live module →</a>
+            </article>
+
+            <article class="wf">
+              <div class="wf-top">
+                <span class="wf-icon c-rad" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="12" cy="12" r="4" /><path d="M12 8v8M8 12h8" /></svg></span>
+                <span class="status next">Next up</span>
+              </div>
+              <h3>Radiology &amp; imaging</h3>
+              <ul>
+                <li>CT, MRI and PET-CT studies pulled from PACS over DICOMweb</li>
+                <li>Free-text reports turned into structured findings</li>
+                <li>RECIST 1.1 target lesions tracked scan to scan</li>
+                <li>Response shown on the timeline, with a viewer link</li>
+              </ul>
+            </article>
+
+            <article class="wf">
+              <div class="wf-top">
+                <span class="wf-icon c-path" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="6" /><path d="M12 16v5M8 21h8" /><circle cx="10" cy="9" r="1.2" /><circle cx="14" cy="11" r="1.2" /></svg></span>
+                <span class="status next">Next up</span>
+              </div>
+              <h3>Pathology &amp; biomarkers</h3>
+              <ul>
+                <li>Histopathology and IHC reports read into fields</li>
+                <li>TNM stage, grade, margins and nodes captured</li>
+                <li>ER/PR/HER2, PD-L1, MSI, EGFR, ALK, BRCA and more</li>
+                <li>Pending tests (e.g. FISH) flagged until resulted</li>
+              </ul>
+            </article>
+
+            <article class="wf">
+              <div class="wf-top">
+                <span class="wf-icon c-surg" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20 15 9" /><path d="M15 9l3-3a2.1 2.1 0 0 1 3 3l-3 3" /><path d="M13 11l3 3" /></svg></span>
+                <span class="status planned">Planned</span>
+              </div>
+              <h3>Surgical oncology</h3>
+              <ul>
+                <li>Pre-op fitness labs and checklist in one view</li>
+                <li>Procedure, margins and nodes from the op note</li>
+                <li>Complications graded with Clavien-Dindo</li>
+                <li>Post-op recovery check-ins from the patient</li>
+              </ul>
+            </article>
+
+            <article class="wf">
+              <div class="wf-top">
+                <span class="wf-icon c-rt" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" /></svg></span>
+                <span class="status planned">Planned</span>
+              </div>
+              <h3>Radiation oncology</h3>
+              <ul>
+                <li>Site, total dose and fractionation per course</li>
+                <li>Fractions delivered and treatment gaps tracked</li>
+                <li>Weekly on-treatment review with skin, mucosa and GI toxicity</li>
+                <li>Concurrent chemo-RT shown together</li>
+              </ul>
+            </article>
+
+            <article class="wf">
+              <div class="wf-top">
+                <span class="wf-icon c-io" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V7l7-4z" /><path d="M9 12l2 2 4-4" /></svg></span>
+                <span class="status planned">Planned</span>
+              </div>
+              <h3>Targeted &amp; immunotherapy</h3>
+              <ul>
+                <li>Line of therapy and biomarker that justified it</li>
+                <li>Immune-related adverse event monitoring</li>
+                <li>Thyroid, liver and cortisol labs watched over months</li>
+                <li>Oral targeted therapy adherence via patient check-ins</li>
+              </ul>
+            </article>
+
+            <article class="wf">
+              <div class="wf-top">
+                <span class="wf-icon c-horm" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="7" rx="3.5" /><path d="M12 9v7" /></svg></span>
+                <span class="status planned">Planned</span>
+              </div>
+              <h3>Hormonal therapy</h3>
+              <ul>
+                <li>Multi-year plans for breast and prostate cancer</li>
+                <li>Refill and adherence reminders</li>
+                <li>Bone health, lipids and side-effect tracking</li>
+              </ul>
+            </article>
+
+            <article class="wf">
+              <div class="wf-top">
+                <span class="wf-icon c-mdt" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3" /><circle cx="16" cy="8" r="3" /><path d="M2 20a6 6 0 0 1 12 0M10 20a6 6 0 0 1 12 0" /></svg></span>
+                <span class="status next">Next up</span>
+              </div>
+              <h3>Tumour board</h3>
+              <ul>
+                <li>One-page case brief: imaging, pathology, labs, prior treatment</li>
+                <li>Every fact linked to its source report</li>
+                <li>Consensus plan and dissent recorded</li>
+              </ul>
+            </article>
+
+            <article class="wf">
+              <div class="wf-top">
+                <span class="wf-icon c-surv" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /><path d="M9 15l2 2 4-4" /></svg></span>
+                <span class="status planned">Planned</span>
+              </div>
+              <h3>Survivorship &amp; palliative</h3>
+              <ul>
+                <li>Surveillance scans and markers scheduled and chased</li>
+                <li>Recurrence signals surfaced from new reports</li>
+                <li>Pain and symptom scores reported from home</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Integrations -->
+      <section class="section" id="integrations">
+        <div class="wrap">
+          <p class="eyebrow">Integrations</p>
+          <h2>Connects to where the data already is</h2>
+          <p class="section-lede">Hospitals already have PACS, lab systems and an HIS, and patients already use WhatsApp. OncoCare reads from them instead of asking anyone to re-type.</p>
+
+          <div class="flow" aria-label="How data flows through OncoCare">
+            <div class="flow-col">
+              <span class="flow-label">Sources</span>
+              <span class="node">WhatsApp</span>
+              <span class="node">PACS · DICOM</span>
+              <span class="node">Lab system · HL7</span>
+              <span class="node">HIS / EMR · FHIR</span>
+              <span class="node">ABDM health records</span>
+            </div>
+            <div class="flow-arrow" aria-hidden="true"><svg viewBox="0 0 40 24"><path d="M2 12h34M28 4l8 8-8 8" /></svg></div>
+            <div class="flow-core">
+              <span class="flow-label">OncoCare</span>
+              <strong>One longitudinal patient record</strong>
+              <ul>
+                <li>AI extraction from reports, images and voice</li>
+                <li>Clinician verification of every value</li>
+                <li>Trends, flags, CTCAE and RECIST</li>
+                <li>Audit trail of every decision</li>
+              </ul>
+            </div>
+            <div class="flow-arrow" aria-hidden="true"><svg viewBox="0 0 40 24"><path d="M2 12h34M28 4l8 8-8 8" /></svg></div>
+            <div class="flow-col">
+              <span class="flow-label">Used by</span>
+              <span class="node out">Oncologist review</span>
+              <span class="node out">Tumour board</span>
+              <span class="node out">Nurse navigator</span>
+              <span class="node out">Patient &amp; family</span>
+              <span class="node out">Insurance pre-auth</span>
+            </div>
+          </div>
+
+          <div class="integrations">
+            <article class="int">
+              <div class="int-top"><span class="int-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.4A8.4 8.4 0 1 1 21 11.5z" /></svg></span><span class="status next">Next up</span></div>
+              <h3>WhatsApp</h3>
+              <p>Cycle reminders, lab photos sent straight into the record, and symptom check-ins by voice note in Indian languages. Red flags escalate to the care team.</p>
+            </article>
+            <article class="int">
+              <div class="int-top"><span class="int-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg></span><span class="status next">Next up</span></div>
+              <h3>DICOM &amp; PACS</h3>
+              <p>Find and fetch studies over DICOMweb (QIDO-RS, WADO-RS), import scans from patient CDs, and open them in a zero-footprint viewer from the timeline.</p>
+            </article>
+            <article class="int">
+              <div class="int-top"><span class="int-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12h4l2-5 4 10 2-5h4" /></svg></span><span class="status next">Next up</span></div>
+              <h3>HL7 FHIR R4</h3>
+              <p>Exchange patients, observations, diagnostic reports and medication requests with hospital EMRs using standard FHIR resources.</p>
+            </article>
+            <article class="int">
+              <div class="int-top"><span class="int-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2" /><circle cx="9" cy="12.5" r="2.2" /><path d="M14 11h4M14 14h3" /></svg></span><span class="status planned">Planned</span></div>
+              <h3>ABDM &amp; ABHA</h3>
+              <p>Link the patient's ABHA number and, with their consent, pull earlier records from other hospitals through the Ayushman Bharat Digital Mission.</p>
+            </article>
+            <article class="int">
+              <div class="int-top"><span class="int-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 10a1.5 1.5 0 0 0 1.3 2h11.4a1.5 1.5 0 0 0 1.3-2L14 9V3" /></svg></span><span class="status planned">Planned</span></div>
+              <h3>Lab systems (LIS)</h3>
+              <p>Receive CBC, LFT, RFT and tumour markers as HL7 v2 results as soon as they are signed, without uploads.</p>
+            </article>
+            <article class="int">
+              <div class="int-top"><span class="int-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" /><path d="M8 9h8M8 13h8M8 17h5" /></svg></span><span class="status live">Live in beta</span></div>
+              <h3>PDF &amp; photo reports</h3>
+              <p>Upload any lab report as a PDF or phone photo. AI extracts the values, an offline parser cross-checks them, and the clinician confirms.</p>
+            </article>
+            <article class="int">
+              <div class="int-top"><span class="int-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 4.4-3.4 8-8 9-4.6-1-8-4.6-8-9V7l8-4z" /><path d="M8 12h8M12 8v8" /></svg></span><span class="status planned">Planned</span></div>
+              <h3>PM-JAY &amp; insurance</h3>
+              <p>Assemble the documents a pre-authorisation needs, such as staging, histopathology and the treatment plan, from what is already in the record.</p>
+            </article>
+            <article class="int">
+              <div class="int-top"><span class="int-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg></span><span class="status planned">Planned</span></div>
+              <h3>SMS &amp; IVR</h3>
+              <p>Reminders and simple symptom check-ins by phone call for patients without a smartphone.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- AI -->
+      <section class="section alt" id="ai">
+        <div class="wrap">
+          <p class="eyebrow">Assistive AI</p>
+          <h2>AI does the reading. The clinician makes the call.</h2>
+          <div class="ai-grid">
+            <article class="ai-card"><span class="ai-verb">Read</span><p>Lab, pathology and radiology reports from PDFs, photos and scanned pages become structured, verifiable data.</p></article>
+            <article class="ai-card"><span class="ai-verb">Listen</span><p>Patients describe symptoms by voice in English, Hindi, Telugu and other Indian languages. Answers are mapped to a fixed question bank.</p></article>
+            <article class="ai-card"><span class="ai-verb">Track</span><p>Every value is compared with baseline and the last visit. Rising grades, rapid changes and missing tests are flagged.</p></article>
+            <article class="ai-card"><span class="ai-verb">Summarise</span><p>Pre-visit and tumour board briefs pull the relevant facts together, each linked back to its source.</p></article>
+          </div>
+          <div class="guardrails">
+            <strong>Guardrails</strong>
+            <ul>
+              <li>Never recommends a treatment</li>
+              <li>AI suggestions are highlighted, never pre-selected</li>
+              <li>Every extracted value shows its source document</li>
+              <li>AI never replies to patients directly</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Chemo (live) -->
+      <section class="section" id="chemo">
+        <div class="wrap">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Live now <span class="status live inline">Live in beta</span></p>
+              <h2>Chemotherapy cycle intelligence</h2>
+            </div>
+          </div>
+          <p class="section-lede">The first module, available to try today. Every cycle is reviewed with the plan, CTCAE toxicities, lab trends and patient-reported symptoms on one screen.</p>
+
+          <div class="chemo-split">
+            <ol class="steps">
+              <li><span class="n">1</span><div><strong>Plan</strong><p>Create the regimen and review each cycle.</p></div></li>
+              <li><span class="n">2</span><div><strong>Capture</strong><p>Record toxicities between cycles, from the clinic or the patient.</p></div></li>
+              <li><span class="n">3</span><div><strong>Labs</strong><p>Upload or enter pre-cycle labs. Trends are computed from baseline.</p></div></li>
+              <li><span class="n">4</span><div><strong>Review</strong><p>See current and previous labs, flags and CTCAE grades together.</p></div></li>
+              <li><span class="n">5</span><div><strong>Decide</strong><p>Proceed, modify, delay, hold, change regimen or discontinue.</p></div></li>
+            </ol>
+
+            <div class="mock" aria-hidden="true">
               <div class="mock-head">
                 <div><span class="mock-label">Pre-cycle review</span><strong>Cycle 3 · Cisplatin 40 mg/m²</strong></div>
                 <span class="pill amber">2 flags</span>
@@ -86,69 +405,50 @@
               </div>
             </div>
           </div>
-        </div>
-      </section>
 
-      <section class="section" id="features">
-        <div class="wrap">
-          <p class="eyebrow">Features</p>
-          <h2>Built around the chemotherapy cycle</h2>
           <div class="features">
             <article class="feature">
               <span class="f-icon" aria-hidden="true">◎</span>
               <h3>Chemo plans per patient</h3>
-              <p>Set the regimen, number of cycles and interval with multiple drugs and default doses, then adjust any individual cycle before it is saved.</p>
+              <p>Regimen, cycle count and interval with multiple drugs and default doses; adjust any cycle before saving.</p>
             </article>
             <article class="feature">
               <span class="f-icon" aria-hidden="true">✓</span>
               <h3>Cycle recording with reasons</h3>
-              <p>Record each cycle as given, modified, delayed, held or discontinued. Every change needs a reason, and the evidence behind it is kept with the decision.</p>
+              <p>Given, modified, delayed, held or discontinued. Every change needs a reason, kept with its evidence.</p>
             </article>
             <article class="feature">
               <span class="f-icon" aria-hidden="true">⇪</span>
               <h3>AI lab report intake</h3>
-              <p>Upload CBP, LFT and RFT reports as PDF or photo. Claude extracts the values, which are cross-checked and confirmed by the clinician. Missing pre-cycle labs are marked.</p>
+              <p>CBC, LFT and RFT from PDF or photo, cross-checked and confirmed by the clinician. Missing labs are marked.</p>
             </article>
             <article class="feature">
               <span class="f-icon" aria-hidden="true">⌁</span>
               <h3>Lab trends and flags</h3>
-              <p>Every result is compared with baseline and the previous cycle. Flags cover crossed limits, rapid changes, rising CTCAE grades, KDIGO creatinine rises and projected crossings.</p>
+              <p>Crossed limits, rapid changes, rising CTCAE grades, KDIGO creatinine rises and projected crossings.</p>
             </article>
             <article class="feature">
               <span class="f-icon" aria-hidden="true">▦</span>
               <h3>CTCAE v6.0 grading</h3>
-              <p>Grade adverse events with CTCAE v6.0 terms. DailyMed drug labels add context on the known toxicities of each drug in the regimen.</p>
+              <p>Adverse events graded with CTCAE terms, with DailyMed label context for each drug in the regimen.</p>
             </article>
             <article class="feature">
               <span class="f-icon" aria-hidden="true">≋</span>
               <h3>Longitudinal view</h3>
-              <p>Labs, toxicities, patient messages and decisions appear on a single timeline across cycles, with the reasoning shown next to each grade.</p>
+              <p>Labs, toxicities, patient messages and decisions on one timeline across cycles.</p>
             </article>
             <article class="feature">
               <span class="f-icon" aria-hidden="true">✎</span>
-              <h3>Between-cycle review</h3>
-              <p>Symptoms reported by the patient appear in the right assessment window by date. Review a report and record it as a CTCAE toxicity in one step.</p>
+              <h3>Spoken check-ins</h3>
+              <p>Patients answer follow-up questions by voice in English, Hindi or Telugu; the doctor grades in one step.</p>
             </article>
             <article class="feature">
               <span class="f-icon" aria-hidden="true">⚑</span>
               <h3>Red-flag triage</h3>
-              <p>Fever, bleeding, breathlessness and other red flags move a message to the top of the inbox, and the patient is told right away to call the team.</p>
+              <p>Fever, bleeding or breathlessness moves a message to the top, and the patient is told to call the team.</p>
             </article>
           </div>
-        </div>
-      </section>
 
-      <section class="section alt" id="workflow">
-        <div class="wrap">
-          <p class="eyebrow">How it works</p>
-          <h2>From plan to decision, every cycle</h2>
-          <ol class="steps">
-            <li><span class="n">1</span><strong>Plan</strong><p>Create the regimen and review each cycle.</p></li>
-            <li><span class="n">2</span><strong>Capture</strong><p>Record toxicities between cycles, from the clinic or the patient.</p></li>
-            <li><span class="n">3</span><strong>Labs</strong><p>Upload or enter pre-cycle labs. Trends are computed from baseline.</p></li>
-            <li><span class="n">4</span><strong>Review</strong><p>See current and previous labs, flags and CTCAE grades together.</p></li>
-            <li><span class="n">5</span><strong>Decide</strong><p>Proceed, modify, delay, hold, change regimen or discontinue.</p></li>
-          </ol>
           <div class="principle">
             <strong>The oncologist makes the decision.</strong>
             <span>OncoCare organises the information and highlights what changed. It never recommends a treatment, and AI suggestions always need clinician confirmation.</span>
@@ -156,16 +456,18 @@
         </div>
       </section>
 
-      <section class="section" id="patients">
+      <!-- Patients -->
+      <section class="section alt" id="patients">
         <div class="wrap split">
           <div>
             <p class="eyebrow">For patients</p>
-            <h2>Stay in touch with your care team between cycles</h2>
+            <h2>Stay in touch with your care team between visits</h2>
             <ul class="checks">
-              <li>See your treatment plan and upcoming cycle dates</li>
+              <li>See your treatment plan and upcoming dates</li>
               <li>View lab results after your team has checked them, with the original reports</li>
               <li>Tell your team how you feel by speaking or typing, in English, Hindi, Telugu, Tamil, Kannada, Malayalam, Marathi or Bengali</li>
               <li>Read replies from your team in the same place</li>
+              <li class="soon">Coming next: reminders and check-ins on WhatsApp</li>
             </ul>
             <a class="btn solid lg" href="/portal">Patient sign in</a>
           </div>
@@ -179,7 +481,7 @@
 
     <footer class="foot">
       <div class="wrap foot-inner">
-        <span>© 2026 Thravi OncoCare · Prototype with synthetic data</span>
+        <span>© 2026 Thravi OncoCare · Beta · Synthetic data only, not for clinical use</span>
         <span><a href="/clinician">Clinician sign in</a> · <a href="/portal">Patient sign in</a></span>
       </div>
     </footer>
