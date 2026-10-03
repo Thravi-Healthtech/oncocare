@@ -1336,7 +1336,8 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             if not target.is_file():
                 return self._json(404, {"error": {"message": "Not found"}})
             content = target.read_bytes()
-            banner = demo_banner_html() if target.suffix == ".html" else b""
+            # The home page carries its own beta notice, so the demo banner is only added to the apps.
+            banner = demo_banner_html() if target.suffix == ".html" and relative != "home.html" else b""
             if banner:
                 match = re.search(rb"<body[^>]*>", content)
                 if match:

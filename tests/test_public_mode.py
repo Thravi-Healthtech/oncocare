@@ -70,10 +70,13 @@ class PublicModeTest(unittest.TestCase):
 
     def test_demo_banner_injected_into_pages_only(self) -> None:
         with mock.patch.dict(os.environ, {"ONCOCARE_DEMO_BANNER": "Demo <only> – synthetic data"}):
-            for path in ["/", "/clinician", "/portal"]:
+            for path in ["/clinician", "/portal"]:
                 status, _, body = self.request("GET", path)
                 self.assertEqual(status, 200)
                 self.assertIn(b"Demo &lt;only&gt;", body)
+            status, _, body = self.request("GET", "/")
+            self.assertEqual(status, 200)
+            self.assertNotIn(b"Demo &lt;only&gt;", body)  # home page has its own beta notice
             _, _, css = self.request("GET", "/styles.css")
             self.assertNotIn(b"Demo", css[:200])
         _, _, body = self.request("GET", "/")
