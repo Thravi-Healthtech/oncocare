@@ -36,8 +36,8 @@ def main() -> None:
 
     if os.environ.get("ONCOCARE_PUBLIC", "").lower() in {"1", "true", "yes"}:
         password = os.environ.get("ONCOCARE_DEV_PASSWORD", "")
-        if len(password) < 10 or password == "1234":
-            raise SystemExit("ONCOCARE_PUBLIC is set: ONCOCARE_DEV_PASSWORD must be set to a strong value (10+ characters).")
+        if len(password) < 8 or password == "1234":
+            raise SystemExit("ONCOCARE_PUBLIC is set: ONCOCARE_DEV_PASSWORD must be set to a value of 8+ characters.")
     migrate(args.db)
     if args.seed:
         seed_demo(args.db)
