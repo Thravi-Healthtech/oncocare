@@ -64,7 +64,7 @@ Flags are grouped per test in the Labs page and in pre-cycle review. They are at
 
 ## v0.4: Patient portal
 
-Patients open **http://127.0.0.1:4173/portal** (mobile-friendly) and sign in with the mobile number on their patient record and the temporary password (see v0.5). Access is turned on or off per patient under **Patient portal → Turn on access**. Sign-in locks for 15 minutes after 5 wrong attempts, and turning access off signs out any open session. Sessions use an HttpOnly cookie and last 12 hours.
+Patients open **http://127.0.0.1:4173/portal** (mobile-friendly) and sign in with the mobile number on their patient record and the temporary password (see v0.5). Access is turned on or off per patient under **Patient portal → Turn on access**. There is no lockout after wrong attempts (removed for the demo). Turning access off signs out any open session. Sessions use an HttpOnly cookie and last 12 hours.
 
 **What patients see (view-only):**
 - Their plan: drugs, doses, and each cycle's date and status in plain language.

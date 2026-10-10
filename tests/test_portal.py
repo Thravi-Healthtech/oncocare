@@ -101,12 +101,12 @@ class PortalTestCase(unittest.TestCase):
         status, _, _ = self.call(doctor, "POST", "/api/patients", {"medical_record_number": "DUP-PHONE", "first_name": "A", "last_name": "B", "phone": "9876543210"})
         self.assertEqual(status, 409)
 
-    def test_lockout_after_failed_attempts(self) -> None:
+    def test_no_lockout_after_failed_attempts(self) -> None:
         self.make_patient("PORTAL-2", "9111111112")
         patient = self.client()
-        for _ in range(5):
+        for _ in range(6):
             self.assertEqual(self.call(patient, "POST", "/api/portal/login", {"phone": "9111111112", "password": "9999"})[0], 401)
-        self.assertEqual(self.call(patient, "POST", "/api/portal/login", {"phone": "9111111112", "password": "1234"})[0], 429)
+        self.assertEqual(self.call(patient, "POST", "/api/portal/login", {"phone": "9111111112", "password": "1234"})[0], 200)
 
     def test_symptom_report_reaches_doctor_and_reply_reaches_patient(self) -> None:
         pid, plan_id = self.make_patient("PORTAL-3", "9222222223")

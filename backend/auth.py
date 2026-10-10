@@ -16,8 +16,6 @@ from typing import Any
 from .database import normalise_phone, row_or_none
 
 SESSION_HOURS = 12
-MAX_FAILED = 5
-LOCK_MINUTES = 15
 DOCTOR_COOKIE = "oncocare_doctor"
 
 
@@ -54,12 +52,9 @@ def login_clinician(connection: sqlite3.Connection, phone: str, password: str) -
     if not clinician["active"]:
         raise AuthError(403, "This account is disabled.")
     now = _now()
-    if clinician["locked_until"] and datetime.fromisoformat(clinician["locked_until"]) > now:
-        raise AuthError(429, "Too many attempts. Try again in 15 minutes.")
+    # No lockout after failed attempts (removed for the demo); failures are still counted.
     if not dev_password_ok(password):
-        failed = clinician["failed_attempts"] + 1
-        locked = (now + timedelta(minutes=LOCK_MINUTES)).isoformat() if failed >= MAX_FAILED else None
-        connection.execute("UPDATE clinicians SET failed_attempts = ?, locked_until = ? WHERE id = ?", (0 if locked else failed, locked, clinician["id"]))
+        connection.execute("UPDATE clinicians SET failed_attempts = failed_attempts + 1, locked_until = NULL WHERE id = ?", (clinician["id"],))
         connection.commit()
         raise generic
     token = secrets.token_urlsafe(32)

@@ -28,8 +28,6 @@ from .database import normalise_phone, row_or_none, rows, transaction, utc_now
 from .reference import CTCAE_TERMS, LAB_CATALOG, SYMPTOM_KEYWORDS, drugs_associated_with
 
 SESSION_HOURS = 12
-MAX_FAILED = 5
-LOCK_MINUTES = 15
 MAX_AUDIO_BYTES = 8_000_000
 AUDIO_TYPES = {"audio/webm": ".webm", "audio/ogg": ".ogg", "audio/mp4": ".m4a", "audio/mpeg": ".mp3", "audio/wav": ".wav", "audio/x-m4a": ".m4a"}
 
@@ -117,13 +115,10 @@ def login(connection: sqlite3.Connection, phone: str, password: str) -> tuple[st
                            (patient["id"], utc_now()))
         access = row_or_none(connection, "SELECT * FROM portal_access WHERE patient_id = ?", (patient["id"],))
     now = _now()
-    if access["locked_until"] and datetime.fromisoformat(access["locked_until"]) > now:
-        raise PortalError(429, "Too many attempts. Please try again in 15 minutes or contact your care team.")
+    # No lockout after failed attempts (removed for the demo); failures are still counted.
     if not dev_password_ok(password):
-        failed = access["failed_attempts"] + 1
-        locked = (now + timedelta(minutes=LOCK_MINUTES)).isoformat() if failed >= MAX_FAILED else None
-        connection.execute("UPDATE portal_access SET failed_attempts = ?, locked_until = ? WHERE patient_id = ?",
-                           (0 if locked else failed, locked, patient["id"]))
+        connection.execute("UPDATE portal_access SET failed_attempts = failed_attempts + 1, locked_until = NULL WHERE patient_id = ?",
+                           (patient["id"],))
         connection.commit()  # keep the attempt count even though the request fails
         raise generic
     token = secrets.token_urlsafe(32)
