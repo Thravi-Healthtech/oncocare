@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from . import radiotherapy as rt
+from . import surgery as sx
 from .database import transaction
 from .errors import ApiError
 
@@ -59,6 +60,20 @@ def _routes(ctx: Ctx) -> list[tuple[str, dict[str, Callable[..., Any]]]]:
         (r"/api/rt-courses/(\d+)/complete", {"POST": lambda cid: _ok(rt.complete(db, cid, ctx.body(), actor))}),
         (r"/api/rt-courses/(\d+)/reopen", {"POST": lambda cid: _ok(rt.reopen(db, cid, ctx.body(), actor))}),
         (r"/api/rt-phases/(\d+)", {"PATCH": lambda phid: _ok(rt.update_phase(db, phid, ctx.body(), actor))}),
+        # Surgical oncology
+        (r"/api/surgery/options", {"GET": lambda: _ok(sx.options())}),
+        (r"/api/patients/(\d+)/surgeries", {
+            "GET": lambda pid: _ok(_with(db, lambda c: sx.list_for_patient(c, pid))),
+            "POST": lambda pid: _ok(_sx_notify(ctx, None, pid), 201)}),
+        (r"/api/surgeries/(\d+)", {
+            "GET": lambda cid: _ok(sx.workspace(db, cid)),
+            "PATCH": lambda cid: _ok(_sx_notify(ctx, cid)),
+            "DELETE": lambda cid: _ok(sx.delete(db, cid))}),
+        (r"/api/surgeries/(\d+)/operation", {"POST": lambda cid: _ok(sx.save_operation(db, cid, ctx.body(), actor))}),
+        (r"/api/surgeries/(\d+)/events", {"POST": lambda cid: _ok(sx.add_event(db, cid, ctx.body(), actor), 201)}),
+        (r"/api/surgery-events/(\d+)", {"DELETE": lambda eid: _ok(sx.delete_event(db, eid))}),
+        (r"/api/surgeries/(\d+)/pathology", {"POST": lambda cid: _ok(sx.save_pathology(db, cid, ctx.body(), actor))}),
+        (r"/api/surgeries/(\d+)/discharge", {"POST": lambda cid: _ok(_sx_discharge(ctx, cid))}),
         # Clinical notes, documents, running summary
         (r"/api/patients/(\d+)/notes", {
             "GET": lambda pid: _ok(records.list_notes(db, pid)),
@@ -116,6 +131,37 @@ def _rt_notify(ctx: Ctx, fn: Callable[..., dict[str, Any]], course_id: int) -> d
     return data
 
 
+def _sx_notify(ctx: Ctx, case_id: int | None, patient_id: int | None = None) -> dict[str, Any]:
+    """Create or update a surgical case; when the surgery date is set or changes and notify_whatsapp is ticked, the patient
+    gets the updated plan and a reminder the day before admission."""
+    from . import whatsapp
+    body = ctx.body()
+    before = sx.workspace(ctx.db, case_id)["case"] if case_id else None
+    data = sx.create(ctx.db, patient_id, body, ctx.actor) if case_id is None else sx.update(ctx.db, case_id, body, ctx.actor)
+    c = data["case"]
+    date_changed = c["surgery_date"] and (before is None or before["surgery_date"] != c["surgery_date"] or before["status"] != c["status"])
+    if body.get("notify_whatsapp") and (date_changed or c["status"] == "cancelled"):
+        sent = [whatsapp.notify(ctx.db, c["patient_id"], "plan", ctx.actor)]
+        if c["status"] == "scheduled":
+            visit = c["admission_date"] or c["surgery_date"]
+            fasting = (c["preop"] or {}).get("fasting_from")
+            sent.append(whatsapp.notify(ctx.db, c["patient_id"], "reminder", ctx.actor, visit_date=visit, visit_time="07:00",
+                                        purpose=f"Admission for surgery ({c['procedure_planned']})" + (f". Nothing to eat or drink from {fasting}" if fasting else "")))
+        data["whatsapp"] = sent
+    return data
+
+
+def _sx_discharge(ctx: Ctx, case_id: int) -> dict[str, Any]:
+    from . import whatsapp
+    body = ctx.body()
+    data = sx.discharge(ctx.db, case_id, body, ctx.actor)
+    fu = (data["case"]["discharge"] or {}).get("follow_up_date")
+    if body.get("notify_whatsapp") and fu:
+        data["whatsapp"] = [whatsapp.notify(ctx.db, data["case"]["patient_id"], "reminder", ctx.actor, visit_date=fu, visit_time="10:00",
+                                            purpose="Review after surgery (wound check" + (", drain" if (data["case"]["discharge"] or {}).get("drains_at_discharge") else "") + ")")]
+    return data
+
+
 def _finalise_notify(ctx: Ctx, summary_id: int) -> dict[str, Any]:
     """Finalising sends the summary, the prescription and a follow-up reminder when notify_whatsapp is set."""
     from . import discharge, whatsapp
@@ -140,7 +186,7 @@ def _with(db: str, fn: Callable[[Any], Any]) -> Any:
 
 
 def dispatch(ctx: Ctx, method: str, path: str) -> Any:
-    if not re.match(r"/api/(rt|rt-|patients/\d+/(rt-courses|notes|documents|summary|discharge|whatsapp)|notes/|documents/|discharge-summaries/|whatsapp/)", path):
+    if not re.match(r"/api/(rt|rt-|surger|patients/\d+/(rt-courses|surgeries|notes|documents|summary|discharge|whatsapp)|notes/|documents/|discharge-summaries/|whatsapp/)", path):
         return None
     for pattern, handlers in _routes(ctx):
         match = re.fullmatch(pattern, path)

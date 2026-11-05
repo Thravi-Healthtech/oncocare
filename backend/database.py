@@ -336,6 +336,49 @@ CREATE TABLE IF NOT EXISTS rt_events (
     created_at TEXT NOT NULL
 );
 
+-- Surgical oncology ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS surgical_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    procedure_planned TEXT NOT NULL,
+    indication TEXT,
+    site TEXT,
+    laterality TEXT,
+    intent TEXT,
+    urgency TEXT NOT NULL DEFAULT 'elective',
+    surgeon TEXT,
+    status TEXT NOT NULL DEFAULT 'planned'
+        CHECK (status IN ('planned', 'scheduled', 'completed', 'discharged', 'cancelled')),
+    surgery_date TEXT,
+    admission_date TEXT,
+    discharge_date TEXT,
+    preop_json TEXT,
+    operation_json TEXT,
+    pathology_json TEXT,
+    discharge_json TEXT,
+    notes TEXT,
+    cancel_reason TEXT,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_surgical_cases_patient ON surgical_cases(patient_id);
+
+CREATE TABLE IF NOT EXISTS surgical_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL REFERENCES surgical_cases(id) ON DELETE CASCADE,
+    event_date TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    clavien_dindo TEXT,
+    complication TEXT,
+    drain_output_ml REAL,
+    pain_score INTEGER,
+    author TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_surgical_events_case ON surgical_events(case_id, event_date);
+
 -- Notes, documents, summaries -------------------------------------------------
 CREATE TABLE IF NOT EXISTS clinical_notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -876,11 +919,63 @@ def _seed_lakshmi(connection: sqlite3.Connection, now: str) -> None:
     for week, when, weight, items, decision, rationale in reviews:
         if when < _date.today():
             _rt_review(connection, course_id, week, when.isoformat(), weight, items, decision, rationale, "Dr. P. Rao", now)
+    _seed_lakshmi_surgery(connection, patient_id, first, now)
     connection.execute("INSERT INTO clinical_notes (patient_id, note_date, category, text, author, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                        (patient_id, (first - _td(days=6)).isoformat(), "progress",
                         "Planning CT done on breast board, arms above head. Post-BCS (right) with clear margins; ER/PR positive, HER2 negative. "
                         "Plan: hypofractionated whole breast + SCF 40.5 Gy/15# VMAT followed by tumour bed boost 10 Gy/5# electrons. "
                         "Letrozole to start after radiotherapy.", "Dr. P. Rao", now, now))
+
+
+def _seed_lakshmi_surgery(connection: sqlite3.Connection, patient_id: int, rt_start, now: str) -> None:
+    """Breast-conserving surgery + sentinel node biopsy about 8 weeks before radiotherapy (from the same synthetic case)."""
+    from datetime import timedelta as _td
+    op = rt_start - _td(days=56)
+    d = lambda n: (op + _td(days=n)).isoformat()  # noqa: E731
+    preop = {"checks": {k: True for k in ("consent", "anaesthesia_fitness", "imaging_reviewed", "mdt", "blood_arranged", "site_marked", "fasting_instructions")},
+             "asa": "II", "comorbidities": "Hypothyroidism on levothyroxine", "investigations": "CBC, RFT, LFT, ECG, chest X-ray normal; mammogram + USG right breast 2.6 cm UOQ mass",
+             "fasting_from": "10 pm the night before", "special_instructions": "Wire localisation of the lump on the morning of surgery"}
+    operation = {"operation_date": d(0), "procedure_performed": "Right breast-conserving surgery (wide local excision) + sentinel lymph node biopsy",
+                 "approach": "Open", "anaesthesia": "General", "surgeon": "Dr. A. Menon", "assistants": "Dr. K. Reddy", "anaesthetist": "Dr. S. Gupta",
+                 "incision": "Curvilinear incision right upper outer quadrant; separate axillary incision",
+                 "findings": "2.8 cm firm lump right UOQ, wire tip within lesion; 3 blue/hot sentinel nodes, one enlarged",
+                 "frozen_section": "Sentinel nodes: 1 of 3 with metastatic carcinoma; margins grossly clear; cavity shaves taken",
+                 "specimens": "WLE (oriented, clips), 4 cavity shaves, 3 sentinel nodes", "ebl_ml": 80, "transfusion_units": 0,
+                 "drains": "One 14 Fr suction drain, axilla", "duration_min": 95, "intraop_events": "None",
+                 "signed_by": "Dr. A. Menon", "signed_at": now}
+    pathology = {"report_date": d(8), "histology": "Invasive ductal carcinoma (NST)", "grade": "2", "size_mm": 28, "pt": "pT2", "pn": "pN1a",
+                 "margins": "negative", "closest_margin_mm": 4, "nodes_examined": 3, "nodes_positive": 1, "lvi": "absent", "pni": "absent",
+                 "biomarkers": "ER positive (90%), PR positive (60%), HER2 negative (IHC 1+), Ki-67 18%", "entered_by": "Dr. A. Menon", "entered_at": now}
+    discharge = {"condition": "Afebrile, ambulant, tolerating diet; wound clean", "drains_at_discharge": "Axillary drain in situ (40 ml/day)",
+                 "wound_care": "Keep dressing dry; drain diary", "suture_removal_date": d(10), "follow_up_date": d(7),
+                 "instructions": "Arm exercises as shown by physiotherapy", "signed_by": "Dr. A. Menon", "signed_at": now}
+    case_id = connection.execute(
+        """INSERT INTO surgical_cases (patient_id, procedure_planned, indication, site, laterality, intent, urgency, surgeon, status, surgery_date,
+               admission_date, discharge_date, preop_json, operation_json, pathology_json, discharge_json, created_by, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 'curative', 'elective', ?, 'discharged', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (patient_id, "Right breast-conserving surgery + sentinel lymph node biopsy", "Carcinoma right breast, cT2 N0 (core biopsy: IDC)", "Right breast",
+         "right", "Dr. A. Menon", d(0), d(-1), d(2), json.dumps(preop), json.dumps(operation), json.dumps(pathology), json.dumps(discharge),
+         "Dr. A. Menon", now, now)).lastrowid
+    events = [
+        (d(-14), "plan", "Surgery planned: Right breast-conserving surgery + sentinel lymph node biopsy, scheduled " + d(0), None, None, None, None),
+        (d(0), "operation", "Operation performed: Right breast-conserving surgery (wide local excision) + sentinel lymph node biopsy (Open)", None, None, None, None),
+        (d(1), "progress", "POD 1: comfortable, afebrile, tolerating oral diet, mobilised. Wound dry.", None, None, 120, 3),
+        (d(2), "progress", "POD 2: drain 40 ml serous. Shoulder exercises started. Fit for discharge with drain.", None, None, 40, 2),
+        (d(2), "discharge", "Discharged on post-operative day 2: Afebrile, ambulant, tolerating diet; wound clean", None, None, None, None),
+        (d(7), "drain", "Drain removed in clinic (output < 30 ml/day for 2 days).", None, None, 25, None),
+        (d(8), "pathology", "Histopathology: Invasive ductal carcinoma (NST), pT2 pN1a, margins negative", None, None, None, None),
+        (d(12), "complication", "Axillary seroma, 150 ml aspirated in clinic under aseptic precautions; no infection.", "I", "Seroma", None, 2),
+    ]
+    for day, kind, text, grade, comp, drain, pain in events:
+        connection.execute("""INSERT INTO surgical_events (case_id, event_date, kind, text, clavien_dindo, complication, drain_output_ml, pain_score, author, created_at)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (case_id, day, kind, text, grade, comp, drain, pain, "Dr. A. Menon", now))
+    connection.execute("INSERT INTO clinical_notes (patient_id, note_date, category, text, author, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       (patient_id, d(-16), "tumour_board", "Tumour board: right breast IDC cT2 N0, suitable for breast conservation. Plan BCS + SLNB, "
+                        "then adjuvant radiotherapy; endocrine therapy if hormone receptor positive.", "Dr. P. Rao", now, now))
+    connection.execute("INSERT INTO clinical_notes (patient_id, note_date, category, text, author, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       (patient_id, d(14), "tumour_board", "Post-op tumour board: pT2 pN1a (1/3 SLN), margins clear, ER/PR+, HER2−. Options discussed; "
+                        "plan whole breast + SCF radiotherapy with tumour bed boost, then letrozole. Chemotherapy per genomic risk discussion with patient.",
+                        "Dr. P. Rao", now, now))
 
 
 def _seed_ananya_rt(connection: sqlite3.Connection, now: str) -> None:

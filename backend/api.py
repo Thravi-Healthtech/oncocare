@@ -23,7 +23,7 @@ from .database import CLINICIAN, normalise_phone, record_cycle_revision, row_or_
 from .extraction import ai_status, extract_candidates, save_ai_settings
 from . import auth, portal
 from .portal import PortalError
-from . import radiotherapy, whatsapp
+from . import radiotherapy, surgery, whatsapp
 from . import questionnaire, voice_answers
 from . import routes_ext
 from http.cookies import SimpleCookie
@@ -356,6 +356,9 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                           SELECT r.id FROM rt_reviews r JOIN rt_courses rc ON rc.id = r.course_id
                           WHERE rc.patient_id = p.id AND rc.status IN ('active', 'on_hold') ORDER BY r.review_date DESC, r.id DESC LIMIT 1)), 0)) AS open_toxicity_grade,
                   (SELECT rc.site FROM rt_courses rc WHERE rc.patient_id = p.id AND rc.status IN ('planned', 'active', 'on_hold') ORDER BY rc.id DESC LIMIT 1) AS active_rt_site,
+                  (SELECT sc.procedure_planned FROM surgical_cases sc WHERE sc.patient_id = p.id AND sc.status IN ('planned', 'scheduled', 'completed') ORDER BY sc.id DESC LIMIT 1) AS active_surgery,
+                  (SELECT sc.surgery_date FROM surgical_cases sc WHERE sc.patient_id = p.id AND sc.status IN ('planned', 'scheduled') ORDER BY sc.surgery_date LIMIT 1) AS next_surgery_date,
+                  (SELECT sc.status FROM surgical_cases sc WHERE sc.patient_id = p.id AND sc.status IN ('planned', 'scheduled', 'completed') ORDER BY sc.id DESC LIMIT 1) AS active_surgery_status,
                   (SELECT rc.id FROM rt_courses rc WHERE rc.patient_id = p.id AND rc.status IN ('planned', 'active', 'on_hold') ORDER BY rc.id DESC LIMIT 1) AS active_rt_id,
                   (SELECT COUNT(*) FROM rt_fractions f JOIN rt_courses rc ON rc.id = f.course_id WHERE rc.patient_id = p.id AND rc.status IN ('planned', 'active', 'on_hold')) AS active_rt_fractions,
                   (SELECT SUM(ph.fractions_planned) FROM rt_phases ph JOIN rt_courses rc ON rc.id = ph.course_id WHERE rc.patient_id = p.id AND rc.status IN ('planned', 'active', 'on_hold')) AS active_rt_planned,
@@ -410,6 +413,7 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                     raise ApiError(HTTPStatus.NOT_FOUND, "Patient not found")
                 patient["treatment_plans"] = self._plans_with_summary(connection, patient_id)
                 patient["rt_courses"] = radiotherapy.list_for_patient(connection, patient_id)
+                patient["surgeries"] = surgery.list_for_patient(connection, patient_id)
             return {"data": patient}
 
         def _plans_with_summary(self, connection: sqlite3.Connection, patient_id: int) -> list[dict[str, Any]]:
@@ -1235,6 +1239,9 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             if path == "/api/portal/radiotherapy" and method == "GET":
                 with transaction(database_path) as connection:
                     return {"data": portal.portal_radiotherapy(connection, patient_id)}, HTTPStatus.OK
+            if path == "/api/portal/surgery" and method == "GET":
+                with transaction(database_path) as connection:
+                    return {"data": portal.portal_surgery(connection, patient_id)}, HTTPStatus.OK
             if path == "/api/portal/summaries" and method == "GET":
                 from . import discharge
                 return {"data": discharge.for_patient(database_path, patient_id)}, HTTPStatus.OK

@@ -283,8 +283,27 @@ def _plan_text(connection: sqlite3.Connection, patient: dict[str, Any], lang: st
         if nxt:
             lines.append(f"• Next cycle (C{nxt['cycle_number']}): {_fmt_day(nxt['planned_date'])}. A blood test may be needed before it.")
         lines.append("")
+    for case in rows(connection, """SELECT * FROM surgical_cases WHERE patient_id = ? AND status IN ('planned', 'scheduled', 'completed', 'cancelled')
+                                    AND (surgery_date IS NULL OR surgery_date >= ? OR status = 'completed') ORDER BY surgery_date""", (patient["id"], date.today().isoformat())):
+        pre = json.loads(case["preop_json"] or "{}")
+        if case["status"] == "cancelled":
+            lines += [f"Surgery: {case['procedure_planned']}", "• This operation has been cancelled. Your care team will discuss the next steps with you.", ""]
+            continue
+        if case["status"] == "completed":
+            continue
+        lines.append(f"Surgery: {case['procedure_planned']}")
+        lines.append(f"• Date: {_fmt_day(case['surgery_date'])}" if case["surgery_date"] else "• Date: to be confirmed")
+        if case["admission_date"]:
+            lines.append(f"• Admission: {_fmt_day(case['admission_date'])}")
+        if pre.get("fasting_from"):
+            lines.append(f"• Nothing to eat or drink from {pre['fasting_from']}")
+        if pre.get("special_instructions"):
+            lines.append(f"• {pre['special_instructions']}")
+        if case["surgeon"]:
+            lines.append(f"• Surgeon: {case['surgeon']}")
+        lines.append("")
     if not lines:
-        raise ApiError(422, "No active treatment plan or approved radiotherapy course to share")
+        raise ApiError(422, "No active treatment plan, surgery or approved radiotherapy course to share")
     return "\n".join(lines).strip()
 
 

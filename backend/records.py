@@ -336,6 +336,53 @@ def collect(connection: sqlite3.Connection, patient_id: int, period_from: str | 
             "worst_toxicities": [t for t in s["worst_toxicities"] if within(t["date"])], "weight_change": s["weight_change"],
             "completion": c["completion"], "concurrent_chemo": w["chemo_plan"]["regimen_name"] if w["chemo_plan"] else None})
 
+    # Surgery
+    from . import surgery as sx
+    surgeries = []
+    for row in rows(connection, "SELECT id FROM surgical_cases WHERE patient_id = ? ORDER BY COALESCE(surgery_date, created_at), id", (patient_id,)):
+        w = sx.build(connection, row["id"])
+        c = w["case"]
+        op, path, dis = c["operation"] or {}, c["pathology"] or {}, c["discharge"] or {}
+        ref = {"type": "surgery", "id": c["id"]}
+        for e in w["events"]:
+            if e["kind"] == "plan":
+                add(e["event_date"], "surgery", f"Surgery planned: {c['procedure_planned']}",
+                    "; ".join(x for x in (c["indication"], f"scheduled {c['surgery_date']}" if c["surgery_date"] else None, f"surgeon {c['surgeon']}" if c["surgeon"] else None) if x),
+                    ref)
+            elif e["kind"] == "operation":
+                add(e["event_date"], "surgery", f"Operation: {op.get('procedure_performed') or c['procedure_planned']}",
+                    "; ".join(x for x in (op.get("approach"), op.get("anaesthesia") and f"{op['anaesthesia']} anaesthesia", op.get("findings") and f"findings: {op['findings']}",
+                                          op.get("frozen_section") and f"frozen section: {op['frozen_section']}", op.get("ebl_ml") is not None and f"blood loss {op['ebl_ml']} ml",
+                                          op.get("drains") and f"drains: {op['drains']}", op.get("intraop_events") and f"intra-operative: {op['intraop_events']}") if x),
+                    ref)
+            elif e["kind"] == "pathology":
+                add(e["event_date"], "surgery", "Final histopathology",
+                    "; ".join(x for x in (path.get("histology"), path.get("grade") and f"grade {path['grade']}", path.get("size_mm") and f"{path['size_mm']} mm",
+                                          " ".join(y for y in (path.get("pt"), path.get("pn")) if y) or None, path.get("margins") and f"margins {path['margins']}"
+                                          + (f" ({path['closest_margin_mm']} mm)" if path.get("closest_margin_mm") is not None else ""),
+                                          path.get("nodes_examined") is not None and f"nodes {path.get('nodes_positive', 0)}/{path['nodes_examined']}",
+                                          path.get("lvi") and f"LVI {path['lvi']}", path.get("biomarkers")) if x),
+                    ref, "warning" if path.get("margins") in ("positive", "close") else None)
+            elif e["kind"] == "discharge":
+                add(e["event_date"], "surgery", "Discharged after surgery", e["text"] + (f"; wound care: {dis['wound_care']}" if dis.get("wound_care") else ""), ref)
+            elif e["kind"] == "status":
+                add(e["event_date"], "surgery", "Surgery plan changed", e["text"], ref, "warning")
+            else:
+                pod = f"POD {e['pod']} · " if e["pod"] is not None else ""
+                add(e["event_date"], "surgery_note", f"{pod}{e['kind_label']}" + (f": {e['complication']}" if e["complication"] else "")
+                    + (f" (Clavien–Dindo {e['clavien_dindo']})" if e["clavien_dindo"] else "") + f" — {e['author']}",
+                    e["text"] + (f" Drain {e['drain_output_ml']:g} ml." if e["drain_output_ml"] is not None else "") + (f" Pain {e['pain_score']}/10." if e["pain_score"] is not None else ""),
+                    ref, "alert" if e["clavien_dindo"] and sx.CD_ORDER.index(e["clavien_dindo"]) >= 2 else "warning" if e["clavien_dindo"] else None)
+        relevant = [d for d in (c["surgery_date"], c["admission_date"], c["discharge_date"], c["created_at"][:10]) if d]
+        if any(within(d) for d in relevant) or not period_from:
+            surgeries.append({"case_id": c["id"], "procedure_planned": c["procedure_planned"], "procedure": op.get("procedure_performed") or c["procedure_planned"],
+                              "status": c["status"], "status_label": c["status_label"], "intent": c["intent"], "surgeon": op.get("surgeon") or c["surgeon"],
+                              "surgery_date": c["surgery_date"], "admission_date": c["admission_date"], "discharge_date": c["discharge_date"],
+                              "approach": op.get("approach"), "findings": op.get("findings"), "pathology": path or None, "stage": w["summary"]["stage"],
+                              "worst_clavien_dindo": w["summary"]["worst_clavien_dindo"],
+                              "complications": [f"{e['complication'] or e['kind_label']} (Clavien–Dindo {e['clavien_dindo']}, {e['event_date']})" for e in w["events"] if e["clavien_dindo"]],
+                              "length_of_stay": w["summary"]["length_of_stay"], "cancel_reason": c["cancel_reason"]})
+
     # Clinician-confirmed CTCAE toxicities (chemotherapy record)
     toxicities: dict[str, dict[str, Any]] = {}
     for sym in rows(connection, "SELECT * FROM symptoms WHERE patient_id = ? ORDER BY onset_date, id", (patient_id,)):
@@ -403,8 +450,8 @@ def collect(connection: sqlite3.Connection, patient_id: int, period_from: str | 
         add(d["finalised_at"][:10], "discharge", "Discharge summary finalised", f"Period {d['period_from'] or '—'} to {d['period_to'] or '—'}",
             {"type": "discharge", "id": d["id"]})
 
-    items.sort(key=lambda i: (i["date"], ["note", "document", "labs", "chemo", "rt", "rt_review", "toxicity", "complaint", "discharge"].index(i["kind"])
-                              if i["kind"] in ("note", "document", "labs", "chemo", "rt", "rt_review", "toxicity", "complaint", "discharge") else 9))
+    rank = {"note": 0, "document": 1, "labs": 2, "surgery": 3, "surgery_note": 3, "chemo": 4, "rt": 5, "rt_review": 6, "toxicity": 7, "complaint": 8, "discharge": 9}
+    items.sort(key=lambda i: (i["date"], rank.get(i["kind"], 99)))  # stable: surgery events keep their recorded order
     for index, item in enumerate(items, start=1):
         item["id"] = f"S{index}"
     open_reports = row_or_none(connection, "SELECT COUNT(*) AS n, SUM(CASE WHEN red_flags_json NOT IN ('[]', '') THEN 1 ELSE 0 END) AS urgent "
@@ -419,7 +466,7 @@ def collect(connection: sqlite3.Connection, patient_id: int, period_from: str | 
     return {
         "patient": {k: patient[k] for k in ("id", "first_name", "last_name", "medical_record_number", "date_of_birth", "sex", "diagnosis", "phone")} | {"age": age},
         "period": {"from": period_from, "to": period_to},
-        "chemotherapy": chemo, "radiotherapy": radiotherapy,
+        "chemotherapy": chemo, "radiotherapy": radiotherapy, "surgery": surgeries,
         "toxicities": sorted(toxicities.values(), key=lambda t: (-t["worst_grade"], t["term"])),
         "labs": [latest_labs[name] for name in KEY_LABS if name in latest_labs],
         "complaints": complaints,
@@ -467,6 +514,24 @@ def rules_narrative(facts: dict[str, Any]) -> str:
             sentences.append(text + "." + _cite(ids))
         if plan["next_cycle"] and not facts["period"]["to"]:
             sentences.append(f"The next {plan['regimen']} cycle (C{plan['next_cycle']['number']}) is planned for {plan['next_cycle']['date']}." + _cite(ids[-1:]))
+    for sxc in facts.get("surgery", []):
+        ids = _sid(items, type="surgery", id=sxc["case_id"])
+        if sxc["status"] in ("completed", "discharged") and sxc["surgery_date"]:
+            text = f"Surgery on {sxc['surgery_date']}: {sxc['procedure']}" + (f" ({sxc['approach'].lower()})" if sxc.get("approach") else "")
+            if sxc.get("pathology"):
+                pth = sxc["pathology"]
+                text += f"; histopathology {pth.get('histology')}" + (f", {sxc['stage']}" if sxc.get("stage") else "") + (f", margins {pth['margins']}" if pth.get("margins") else "")
+            if sxc["complications"]:
+                text += f"; complications: {', '.join(sxc['complications'][:3])}"
+            elif sxc["status"] == "discharged":
+                text += "; no complications recorded"
+            if sxc.get("length_of_stay") is not None:
+                text += f"; length of stay {sxc['length_of_stay']} day(s)"
+            sentences.append(text + "." + _cite(ids))
+        elif sxc["status"] == "cancelled":
+            sentences.append(f"Planned {sxc['procedure_planned']} was cancelled ({sxc.get('cancel_reason') or 'reason not recorded'})." + _cite(ids))
+        elif sxc["surgery_date"]:
+            sentences.append(f"{sxc['procedure_planned']} is scheduled for {sxc['surgery_date']}." + _cite(ids))
     for course in facts["radiotherapy"]:
         ids = _sid(items, type="rt_course", id=course["course_id"])
         phases = "; ".join(f"{p['name']} {rt.gy(p['dose_per_fraction_cgy'] * p['fractions_planned'])}/{p['fractions_planned']}# {p['technique'] or ''}".strip()

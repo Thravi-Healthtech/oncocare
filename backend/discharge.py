@@ -83,8 +83,21 @@ def _build(connection: sqlite3.Connection, patient_id: int, period_from: str, pe
         "advice": keep.get("advice") or "",
         "follow_up": keep.get("follow_up") or {"date": "", "with": "", "instructions": "", "none": False},
     }
+    excluded = {a["key"] for a in keep.get("activity") or [] if not a.get("include", True)}
+    content["surgery"] = facts.get("surgery", [])
+    content["activity"] = [{"key": activity_key(i), "id": i["id"], "date": i["date"], "kind": i["kind"], "title": i["title"], "detail": i["detail"],
+                            "severity": i.get("severity"), "include": activity_key(i) not in excluded} for i in facts["items"]]
     sources = [{k: i[k] for k in ("id", "date", "kind", "title", "detail", "ref")} for i in facts["items"]]
     return content, sources, course.get("method") or "rules"
+
+
+ACTIVITY_LABEL = {"chemo": "Chemotherapy", "rt": "Radiotherapy", "rt_review": "Radiotherapy review", "surgery": "Surgery", "surgery_note": "Post-operative",
+                  "toxicity": "Toxicity (CTCAE)", "labs": "Investigations", "complaint": "Patient message", "note": "Clinical note", "document": "Report",
+                  "discharge": "Summary"}
+
+
+def activity_key(item: dict[str, Any]) -> str:
+    return f"{item['date']}|{item['kind']}|{item['title']}"
 
 
 def list_for_patient(db: str, patient_id: int) -> list[dict[str, Any]]:
@@ -157,6 +170,10 @@ def update_draft(db: str, summary_id: int, payload: dict[str, Any], actor: str) 
                 content[key] = records._text(payload[key], 4000 if key != "title" else 120) or ""
         if "medications" in payload:
             content["medications"] = _medications(payload["medications"])
+        if "activity_excluded" in payload:
+            excluded = {str(k) for k in payload["activity_excluded"] or []}
+            for item in content.get("activity") or []:
+                item["include"] = item["key"] not in excluded
         if "follow_up" in payload:
             fu = payload["follow_up"] if isinstance(payload["follow_up"], dict) else {}
             fu_date = fu.get("date") or ""
@@ -289,6 +306,26 @@ def print_html(db: str, summary_id: int, patient_id: int | None = None) -> str:
         + (f"<li>Concurrent: {_e(x['concurrent_chemo'])}</li>" if x["concurrent_chemo"] else "")
         + (f"<li>Status: {_e(x['completion']['outcome_label'])}</li>" if x["completion"] else "") + "</ul>"
         for x in c["radiotherapy"])
+    surg = "".join(
+        f"<p><strong>{_e(x['procedure'])}</strong> — {_e(x['status_label'])}" + (f", {_e(x['surgery_date'])}" if x.get("surgery_date") else "")
+        + (f" ({_e(x['approach'])})" if x.get("approach") else "") + (f", surgeon {_e(x['surgeon'])}" if x.get("surgeon") else "") + ".</p><ul>"
+        + (f"<li>Findings: {_e(x['findings'])}</li>" if x.get("findings") else "")
+        + (f"<li>Histopathology: {_e(x['pathology'].get('histology'))}{', ' + _e(x['stage']) if x.get('stage') else ''}"
+           f"{', margins ' + _e(x['pathology'].get('margins')) if x['pathology'].get('margins') else ''}"
+           f"{', nodes ' + _e(x['pathology'].get('nodes_positive', 0)) + '/' + _e(x['pathology'].get('nodes_examined')) if x['pathology'].get('nodes_examined') is not None else ''}"
+           f"{', ' + _e(x['pathology'].get('biomarkers')) if x['pathology'].get('biomarkers') else ''}</li>" if x.get("pathology") else "")
+        + (f"<li>Complications: {_e('; '.join(x['complications']))}</li>" if x.get("complications") else "")
+        + (f"<li>Admission {_e(x['admission_date'])} to discharge {_e(x['discharge_date'])} ({x['length_of_stay']} days)</li>" if x.get("length_of_stay") is not None else "")
+        + (f"<li>Cancelled: {_e(x['cancel_reason'])}</li>" if x.get("cancel_reason") else "") + "</ul>"
+        for x in c.get("surgery") or [])
+    included = [a for a in c.get("activity") or [] if a.get("include", True)]
+    activity, last = "", ""
+    for a in included:
+        if a["date"] != last:
+            activity += ("</ul>" if last else "") + f"<h3>{_e(date.fromisoformat(a['date']).strftime('%a %d %b %Y'))}</h3><ul class=\"act\">"
+            last = a["date"]
+        activity += f"<li><b>{_e(ACTIVITY_LABEL.get(a['kind'], a['kind']))}</b> — {_e(a['title'])}<br><span>{_e(_strip_citations(a['detail']))}</span></li>"
+    activity += "</ul>" if included else ""
     tox = ("<table><thead><tr><th>Toxicity (CTCAE)</th><th>Worst grade</th><th>Date</th><th>Recorded in</th></tr></thead><tbody>"
            + "".join(f"<tr><td>{_e(t['term'])}</td><td>G{t['worst_grade']}</td><td>{_e(t['date'])}</td><td>{_e(t['source'])}</td></tr>" for t in c["toxicities"])
            + "</tbody></table>") if c["toxicities"] else ""
@@ -318,6 +355,8 @@ header {{ display:flex; justify-content:space-between; gap:16px; border-bottom:2
 h1 {{ font-size:22px; margin:0 0 4px }} h2 {{ font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); margin:20px 0 6px }}
 .meta {{ color:var(--muted); font-size:13px }} table {{ width:100%; border-collapse:collapse; font-size:13px }} th, td {{ text-align:left; padding:5px 6px; border-bottom:1px solid var(--line); vertical-align:top }}
 th {{ color:var(--muted); font-weight:600 }} ul {{ margin:4px 0 0 18px; padding:0 }} p {{ margin:4px 0 }}
+h3 {{ font-size:12px; margin:12px 0 2px; color:var(--muted) }} ul.act {{ list-style:none; margin:0; padding:0 }} ul.act li {{ padding:4px 0; border-bottom:1px dashed var(--line); font-size:13px }}
+ul.act li span {{ color:#3c4b55 }}
 .grid {{ display:grid; grid-template-columns:repeat(4, 1fr); gap:6px 16px; font-size:13px }} .grid b {{ display:block; color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase }}
 footer {{ margin-top:28px; padding-top:10px; border-top:1px solid var(--line); color:var(--muted); font-size:12px }}
 .draft {{ position:absolute; top:12px; right:16px; color:#a33; border:2px solid #a33; padding:2px 10px; font-weight:700; letter-spacing:.1em; border-radius:4px }}
@@ -332,9 +371,11 @@ footer {{ margin-top:28px; padding-top:10px; border-top:1px solid var(--line); c
 <div class="grid"><div><b>Patient</b>{_e(p['first_name'])} {_e(p['last_name'])}</div><div><b>MRN</b>{_e(p['medical_record_number'])}</div>
 <div><b>Age / sex</b>{_e(age)} {_e(p.get('sex') or '')}</div><div><b>Mobile</b>{_e(p.get('phone') or '—')}</div></div>
 {section('Diagnosis', f'<p>{_e(c["diagnosis"])}</p>')}
+{section('Surgery', surg)}
 {section('Chemotherapy', chemo)}
 {section('Radiotherapy', radio)}
 {section('Course during treatment', f'<p>{_e(_strip_citations((c.get("course") or {}).get("text", "")))}</p>')}
+{section('Activity during this period (date order)', activity)}
 {section('Toxicities', tox)}
 {section('Complaints reported between visits', complaints)}
 {section('Latest investigations', labs)}

@@ -490,3 +490,79 @@ class WhatsAppAgentTests(Base):
         self.call("POST", f"/api/patients/{self.pid}/whatsapp/consent", {"opt_in": False})
         status, body = self.call("PATCH", f"/api/rt-courses/{cid}", {"status": "on_hold", "status_reason": "Skin", "notify_whatsapp": True})
         self.assertEqual(body["data"]["whatsapp"][0]["status"], "skipped")
+
+
+class SurgeryTests(Base):
+    def test_surgical_case_flow(self) -> None:
+        pid = self.patient("SX-1", phone="9512345601")
+        self.call("POST", f"/api/patients/{pid}/whatsapp/consent", {"opt_in": True, "method": "in_clinic_written"})
+        day = (date.today() + timedelta(days=4)).isoformat()
+        status, body = self.call("POST", f"/api/patients/{pid}/surgeries", {
+            "procedure_planned": "Modified radical mastectomy", "intent": "curative", "surgeon": "Dr. A. Menon", "surgery_date": day,
+            "admission_date": (date.today() + timedelta(days=3)).isoformat(), "preop": {"checks": {"consent": True}, "asa": "II", "fasting_from": "10 pm"},
+            "notify_whatsapp": True})
+        self.assertEqual(status, 201, body)
+        w = body["data"]
+        cid = w["case"]["id"]
+        self.assertEqual(w["case"]["status"], "scheduled")
+        self.assertEqual([x["status"] for x in w["whatsapp"]], ["sent", "scheduled"])
+        self.assertTrue(any("Pre-op checklist: 6 item(s) open, surgery in 4 day(s)" in a["text"] for a in w["summary"]["attention"]))
+        _, thread = self.call("GET", f"/api/patients/{pid}/whatsapp")
+        self.assertIn("Nothing to eat or drink from 10 pm", [m for m in thread["data"]["messages"] if m["kind"] == "plan"][0]["body"])
+        # Post-op notes need the operation note first; the operation note must be signed.
+        status, _ = self.call("POST", f"/api/surgeries/{cid}/events", {"text": "POD 1 fine"})
+        self.assertEqual(status, 422)
+        today = date.today().isoformat()
+        status, _ = self.call("POST", f"/api/surgeries/{cid}/operation", {"operation_date": today, "procedure_performed": "MRM", "surgeon": "Dr. A. Menon"})
+        self.assertEqual(status, 422)
+        status, body = self.call("POST", f"/api/surgeries/{cid}/operation", {"operation_date": today, "procedure_performed": "Right MRM", "surgeon": "Dr. A. Menon",
+                                                                            "approach": "Open", "ebl_ml": "150", "signed": True})
+        self.assertEqual(status, 200, body)
+        self.assertEqual(body["data"]["case"]["status"], "completed")
+        status, _ = self.call("POST", f"/api/surgeries/{cid}/events", {"kind": "complication", "text": "Flap edge necrosis", "complication": "Flap necrosis"})
+        self.assertEqual(status, 422)  # needs Clavien-Dindo
+        status, body = self.call("POST", f"/api/surgeries/{cid}/events", {"kind": "complication", "text": "Debrided under GA", "complication": "Flap necrosis", "clavien_dindo": "IIIb"})
+        self.assertEqual(status, 201, body)
+        self.assertEqual(body["data"]["summary"]["worst_clavien_dindo"], "IIIb")
+        status, _ = self.call("POST", f"/api/surgeries/{cid}/pathology", {"histology": "IDC", "nodes_examined": 2, "nodes_positive": 5})
+        self.assertEqual(status, 422)
+        status, body = self.call("POST", f"/api/surgeries/{cid}/pathology", {"histology": "IDC", "pt": "pT2", "pn": "pN0", "margins": "positive", "nodes_examined": 12, "nodes_positive": 0})
+        self.assertTrue(any("Positive resection margin" in a["text"] for a in body["data"]["summary"]["attention"]))
+        status, body = self.call("POST", f"/api/surgeries/{cid}/discharge", {"condition": "Stable", "follow_up_date": (date.today() + timedelta(days=7)).isoformat(), "notify_whatsapp": True})
+        self.assertEqual(status, 200, body)
+        self.assertEqual(body["data"]["case"]["status"], "discharged")
+        self.assertEqual(body["data"]["whatsapp"][0]["status"], "scheduled")
+        # Patient record lists every modality; portal sees the operation in plain language.
+        _, patient = self.call("GET", f"/api/patients/{pid}")
+        self.assertEqual(patient["data"]["surgeries"][0]["stage"], "pT2 pN0")
+
+    def test_cancel_needs_reason(self) -> None:
+        pid = self.patient("SX-2")
+        cid = self.call("POST", f"/api/patients/{pid}/surgeries", {"procedure_planned": "Whipple"})[1]["data"]["case"]["id"]
+        self.assertEqual(self.call("PATCH", f"/api/surgeries/{cid}", {"status": "cancelled"})[0], 422)
+        status, body = self.call("PATCH", f"/api/surgeries/{cid}", {"status": "cancelled", "cancel_reason": "Metastatic on staging PET"})
+        self.assertEqual(body["data"]["case"]["status"], "cancelled")
+
+    def test_discharge_summary_activity_with_notes(self) -> None:
+        pid = self.patient("SX-3")
+        today = date.today().isoformat()
+        cid = self.call("POST", f"/api/patients/{pid}/surgeries", {"procedure_planned": "Wide local excision", "surgery_date": today})[1]["data"]["case"]["id"]
+        self.call("POST", f"/api/surgeries/{cid}/operation", {"operation_date": today, "procedure_performed": "Wide local excision", "surgeon": "Dr. A", "signed": True})
+        self.call("POST", f"/api/surgeries/{cid}/events", {"text": "Comfortable, wound dry.", "pain_score": 2})
+        self.call("POST", f"/api/patients/{pid}/notes", {"text": "Family counselled about histopathology timelines.", "category": "counselling"})
+        _, ds = self.call("POST", f"/api/patients/{pid}/discharge-summaries", {"period_from": today})
+        content = ds["data"]["content"]
+        self.assertEqual(content["surgery"][0]["procedure"], "Wide local excision")
+        kinds = [a["kind"] for a in content["activity"]]
+        self.assertIn("note", kinds)
+        self.assertIn("surgery_note", kinds)
+        self.assertEqual([a["date"] for a in content["activity"]], sorted(a["date"] for a in content["activity"]))
+        note_key = next(a["key"] for a in content["activity"] if a["kind"] == "note")
+        sid = ds["data"]["id"]
+        self.call("PATCH", f"/api/discharge-summaries/{sid}", {"activity_excluded": [note_key]})
+        _, regen = self.call("POST", f"/api/discharge-summaries/{sid}/regenerate", {})
+        self.assertFalse(next(a for a in regen["data"]["content"]["activity"] if a["key"] == note_key)["include"])
+        _, page = self.call("GET", f"/api/discharge-summaries/{sid}/print")
+        self.assertIn("Activity during this period", page)
+        self.assertIn("Comfortable, wound dry.", page)
+        self.assertNotIn("Family counselled", page)

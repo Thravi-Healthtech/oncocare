@@ -204,6 +204,23 @@ def portal_radiotherapy(connection: sqlite3.Connection, patient_id: int) -> list
     return out
 
 
+def portal_surgery(connection: sqlite3.Connection, patient_id: int) -> list[dict[str, Any]]:
+    """Operations in plain language: what, when, admission, preparation, discharge advice. No grades or internal notes."""
+    from . import surgery
+    out = []
+    for row in rows(connection, "SELECT id FROM surgical_cases WHERE patient_id = ? AND status != 'cancelled' ORDER BY COALESCE(surgery_date, created_at) DESC", (patient_id,)):
+        w = surgery.build(connection, row["id"])
+        c = w["case"]
+        op, dis, pre = c["operation"] or {}, c["discharge"] or {}, c["preop"] or {}
+        out.append({"id": c["id"], "procedure": op.get("procedure_performed") or c["procedure_planned"],
+                    "status": {"planned": "Planned", "scheduled": "Scheduled", "completed": "Done — in hospital", "discharged": "Done"}[c["status"]],
+                    "surgery_date": c["surgery_date"], "admission_date": c["admission_date"], "discharge_date": c["discharge_date"],
+                    "fasting_from": pre.get("fasting_from"), "instructions": pre.get("special_instructions"),
+                    "wound_care": dis.get("wound_care"), "suture_removal_date": dis.get("suture_removal_date"), "follow_up_date": dis.get("follow_up_date"),
+                    "discharge_instructions": dis.get("instructions"), "surgeon": c["surgeon"]})
+    return out
+
+
 def portal_labs(connection: sqlite3.Connection, patient_id: int) -> dict[str, Any]:
     labs = rows(connection, """SELECT l.id, l.test_name, l.value, l.unit, l.ref_low, l.ref_high, l.collection_date, l.document_id, c.cycle_number
                                FROM lab_investigations l JOIN treatment_cycles c ON c.id = l.cycle_id
