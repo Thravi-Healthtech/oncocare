@@ -97,7 +97,7 @@ ORDINALS = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "प�
 
 def _norm(text: str) -> str:
     text = text.lower().replace("’", "'")
-    text = re.sub(r"[.,!?;:\"()।]", " ", text)
+    text = re.sub(r"(?<!\d)\.|\.(?!\d)|[,!?;:\"()।]", " ", text)  # keep decimal points (38.5)
     return re.sub(r"\s+", " ", text).strip()
 
 

@@ -174,7 +174,7 @@ const STR = {
     edit: "Change", send: "Send to my care team", sending: "Sending…", yourWords: "Your words", noNew: "No new symptoms",
     sentTitle: "Sent to your care team ✓", sentBody: "Your care team will review it. You'll see their reply under \"My messages\".",
     urgentTitle: "Please call your care team now",
-    urgentBody: "Some of what you told us can be serious during chemotherapy. Call your care team now, or go to the nearest emergency department. Do not wait for a reply here.",
+    urgentBody: "Some of what you told us can be serious during cancer treatment. Call your care team now, or go to the nearest emergency department. Do not wait for a reply here.",
     call112: "Call 112 (emergency)", newCheckin: "Start a new check-in", checkinTag: "Check-in", noMessages: "You have not sent any messages yet.",
     reply: "Reply from your care team", urgentNoted: "Urgent symptoms noted", pickOne: "Choose at least one symptom, or go back and choose \"No new symptoms\"." },
   hi: { vcToggle: "सवाल बोलकर पूछें", vcSpeaking: "पूछ रहे हैं…", vcListening: "सुन रहे हैं – अब जवाब दें", vcNotSure: "माफ़ कीजिए, समझ नहीं आया। फिर से बोलें या जवाब पर दबाएं।", vcRepeat: "माफ़ कीजिए, सुनाई नहीं दिया।", vcTapInstead: "कृपया स्क्रीन पर अपना जवाब दबाएं।", vcAnswerByVoice: "बोलकर जवाब दें", vcNoVoice: "इस डिवाइस पर इस भाषा की आवाज़ इंस्टॉल नहीं है, इसलिए सवाल पढ़कर नहीं सुनाए जाएंगे। आप फिर भी बोलकर जवाब दे सकते हैं।", vcConfirm: "कृपया हमें मिले लक्षण जांच लें। जोड़ने या हटाने के लिए दबाएं, फिर आगे दबाएं।", vcReview: "कृपया अपने जवाब जांच लें, फिर भेजें दबाएं।", vcAbout: "अब {s} के बारे में कुछ सवाल।",

@@ -150,7 +150,8 @@ function catalog(test) { return S.reference?.lab_catalog.find(t => t.test_name =
 const CHECKLIST_LABEL = { nausea: "Feeling sick", vomiting: "Vomiting", diarrhoea: "Loose stools", constipation: "Constipation", mouth_sores: "Mouth sores",
   appetite: "Poor appetite", taste: "Taste change", tiredness: "Tiredness", tingling: "Tingling / numbness", hearing: "Hearing change",
   ringing_ears: "Ringing in ears", hair_loss: "Hair loss", rash: "Rash", muscle_pain: "Muscle pain", joint_pain: "Joint pain", swelling: "Swelling",
-  fever: "Fever / chills", bleeding: "Bleeding / bruising", breathless: "Short of breath", urine_blood: "Blood in urine", hand_foot: "Hand-foot skin", other: "Other" };
+  fever: "Fever / chills", bleeding: "Bleeding / bruising", breathless: "Short of breath", urine_blood: "Blood in urine", hand_foot: "Hand-foot skin", other: "Other",
+  skin_reaction: "Skin reaction (RT area)", dry_mouth: "Dry mouth", swallowing: "Swallowing difficulty" };
 const REPORT_STATUS = { new: ["Awaiting review", "chip-warn"], reviewed: ["Reviewed", "chip-ok"], recorded: ["Recorded as CTCAE", "chip-teal"], dismissed: ["Dismissed", ""] };
 const SAFETY_SHORT = { fever: "Fever ≥38 °C / chills", fluids: "Keeps fluids down", urine: "Passing urine", bleeding: "Bleeding / black stool", breathing: "Breathless / chest pain" };
 const SAFETY_BAD = { fever: ["yes"], fluids: ["no"], urine: ["less", "none"], bleeding: ["yes"], breathing: ["yes"] };

@@ -25,6 +25,22 @@ from .database import migrate, seed_demo  # noqa: E402
 from .extraction import ai_status  # noqa: E402
 
 
+def start_scheduler(db_path: str) -> None:
+    """Every minute: send scheduled WhatsApp reminders that are due and close idle WhatsApp check-ins."""
+    import threading
+    import time
+    from . import whatsapp
+
+    def loop() -> None:
+        while True:
+            try:
+                whatsapp.run_due(db_path)
+            except Exception as error:  # keep the scheduler alive
+                print(f"WhatsApp scheduler: {type(error).__name__}: {error}")
+            time.sleep(60)
+    threading.Thread(target=loop, name="whatsapp-scheduler", daemon=True).start()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Thravi OncoCare local API server")
     parser.add_argument("--host", default="127.0.0.1")
@@ -42,12 +58,16 @@ def main() -> None:
     if args.seed:
         seed_demo(args.db)
     handler = make_handler(args.db, args.static_dir)
+    start_scheduler(args.db)
     server = ThreadingHTTPServer((args.host, args.port), handler)
     print(f"Thravi OncoCare running at http://{args.host}:{args.port}")
     print(f"Clinician app: http://{args.host}:{args.port}/clinician · Patient portal: http://{args.host}:{args.port}/portal")
     print(f"API health: http://{args.host}:{args.port}/health")
     status = ai_status()
     print(f"AI lab extraction: {'ON (' + status['model'] + ')' if status['enabled'] else 'OFF - ' + status['hint']}")
+    from .whatsapp import status as wa_status
+    wa = wa_status()
+    print(f"WhatsApp: {wa['mode']}" + (f" ({wa['note']})" if wa["note"] else ""))
     try:
         server.serve_forever()
     except KeyboardInterrupt:
