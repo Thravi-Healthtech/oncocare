@@ -20,6 +20,11 @@ def load_env(path: Path) -> None:
 
 load_env(Path(os.environ.get("ONCOCARE_ENV_FILE", Path(__file__).resolve().parents[1] / ".env")))
 
+# Clinical dates ("today", treatment dates, reminders) follow the clinic's local day, not the server's UTC day.
+os.environ["TZ"] = os.environ.get("ONCOCARE_TZ", "Asia/Kolkata")
+if hasattr(__import__("time"), "tzset"):
+    __import__("time").tzset()
+
 from .api import make_handler  # noqa: E402
 from .database import migrate, seed_demo  # noqa: E402
 from .extraction import ai_status  # noqa: E402

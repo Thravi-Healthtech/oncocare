@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Thravi OncoCare chemotherapy cycle intelligence prototype" />
+    <meta name="description" content="Thravi OncoCare: chemotherapy and radiotherapy workflows, running summaries and patient messaging" />
     <title>Thravi OncoCare</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -34,9 +34,18 @@
         <nav class="nav-list">
           <a class="nav-item" href="#patients" data-nav="patients"><span class="nav-icon">♙</span><span>Patients</span></a>
           <a class="nav-item" href="#inbox" data-nav="inbox"><span class="nav-icon">✉</span><span>Patient messages</span><span class="nav-badge hidden" id="inboxBadge">0</span></a>
+          <a class="nav-item" href="#whatsapp" data-nav="whatsapp"><span class="nav-icon">◍</span><span>WhatsApp</span><span class="nav-badge hidden" id="waBadge">0</span></a>
           <div id="navPatient" class="nav-group hidden">
             <p class="nav-caption" id="navPatientName">Patient</p>
             <a class="nav-item" data-nav="patient" href="#"><span class="nav-icon">◉</span><span>Patient record</span></a>
+            <a class="nav-item" data-nav="summary" href="#"><span class="nav-icon">≡</span><span>Running summary</span></a>
+          </div>
+          <div id="navRT" class="nav-group hidden">
+            <p class="nav-caption" id="navRTName">Radiotherapy</p>
+            <a class="nav-item" data-nav="rt-plan" href="#"><span class="nav-icon">◎</span><span>Prescription &amp; plan</span></a>
+            <a class="nav-item" data-nav="rt-daily" href="#"><span class="nav-icon">▤</span><span>Daily treatment</span></a>
+            <a class="nav-item" data-nav="rt-weekly" href="#"><span class="nav-icon">◇</span><span>Weekly review</span></a>
+            <a class="nav-item" data-nav="rt-complete" href="#"><span class="nav-icon">✓</span><span>Completion</span></a>
           </div>
           <div id="navPlan" class="nav-group hidden">
             <p class="nav-caption" id="navPlanName">Treatment plan</p>
@@ -171,6 +180,67 @@
             </div>
             <div id="timelineSummary"></div>
             <div id="timeline" class="timeline top-gap"></div>
+          </section>
+
+          <!-- Radiation oncology: prescription & plan -->
+          <section class="view" data-view="rt-plan" aria-labelledby="rtPlanTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Radiation oncology</p><h1 id="rtPlanTitle">Prescription &amp; plan</h1><p class="rt-subtitle"></p></div>
+              <div class="heading-actions" id="rtPlanActions"></div>
+            </div>
+            <div id="rtPlan"></div>
+          </section>
+
+          <!-- Radiation oncology: daily treatment record -->
+          <section class="view" data-view="rt-daily" aria-labelledby="rtDailyTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Radiation oncology</p><h1 id="rtDailyTitle">Daily treatment</h1><p class="rt-subtitle"></p></div>
+            </div>
+            <div id="rtDaily"></div>
+          </section>
+
+          <!-- Radiation oncology: weekly review -->
+          <section class="view" data-view="rt-weekly" aria-labelledby="rtWeeklyTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Radiation oncology</p><h1 id="rtWeeklyTitle">Weekly review</h1><p>Early reactions during radiation therapy, graded with CTCAE terms and confirmed by the clinician, with the decision for the coming week.</p></div>
+              <button class="button primary" data-rt="new-review">+ Record weekly review</button>
+            </div>
+            <div id="rtWeekly"></div>
+          </section>
+
+          <!-- Radiation oncology: completion -->
+          <section class="view" data-view="rt-complete" aria-labelledby="rtCompleteTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Radiation oncology</p><h1 id="rtCompleteTitle">Completion summary</h1><p class="rt-subtitle"></p></div>
+            </div>
+            <div id="rtComplete"></div>
+          </section>
+
+          <!-- Running summary -->
+          <section class="view" data-view="summary" aria-labelledby="summaryTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Running summary</p><h1 id="summaryTitle">Patient summary</h1><p id="summarySubtitle"></p></div>
+              <div class="heading-actions"><button class="button secondary" data-rec="add-note">+ Note</button><button class="button secondary" data-rec="upload-doc">Upload report</button><button class="button primary" data-rec="new-discharge">Create discharge summary</button></div>
+            </div>
+            <div id="summaryContent"></div>
+          </section>
+
+          <!-- Discharge summary editor -->
+          <section class="view" data-view="discharge" aria-labelledby="dischargeTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow" id="dischargeEyebrow">Discharge summary</p><h1 id="dischargeTitle">Discharge summary</h1><p id="dischargeSubtitle"></p></div>
+              <div class="heading-actions" id="dischargeActions"></div>
+            </div>
+            <div id="dischargeContent"></div>
+          </section>
+
+          <!-- WhatsApp -->
+          <section class="view" data-view="whatsapp" aria-labelledby="waTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Patient communication</p><h1 id="waTitle">WhatsApp</h1><p>Share plans, prescriptions, summaries and visit reminders after you approve them. Patients reply in the same chat; automatic replies are fixed texts and the symptom questions, never AI.</p></div>
+              <span id="waModeBadge" class="chip"></span>
+            </div>
+            <div id="waContent"></div>
           </section>
         </main>
       </div>
@@ -377,6 +447,116 @@
         </form>
       </div>
     </div>
+
+    <!-- Radiotherapy course (create / edit) -->
+    <div class="modal" id="rtCourseModal" role="dialog" aria-modal="true" aria-labelledby="rtCourseTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card preview-modal">
+        <div class="modal-heading"><div><p class="eyebrow">Radiation oncology · case sheet</p><h2 id="rtCourseTitle">New radiotherapy course</h2><p class="muted">Cover sheet: diagnosis, prescription by phase and set-up data. The plan is approved by the physicist and radiation oncologist before treatment.</p></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="rtCourseForm" novalidate>
+          <div class="form-grid three">
+            <label class="field span-2"><span>Site / target volume</span><input name="site" maxlength="160" placeholder="e.g. Right breast + supraclavicular fossa" required /></label>
+            <label class="field"><span>Site group</span><select name="site_group"></select></label>
+            <label class="field"><span>Laterality</span><select name="laterality"><option value="">Not applicable</option><option value="right">Right</option><option value="left">Left</option><option value="bilateral">Bilateral</option><option value="midline">Midline</option></select></label>
+            <label class="field"><span>Intent</span><select name="intent"><option value="">Not recorded</option><option value="curative">Curative</option><option value="adjuvant">Adjuvant</option><option value="neoadjuvant">Neoadjuvant</option><option value="palliative">Palliative</option><option value="other">Other</option></select></label>
+            <label class="field"><span>Machine</span><input name="machine" maxlength="80" value="Elekta Versa HD" /></label>
+            <label class="field span-2"><span>Diagnosis</span><input name="diagnosis" maxlength="250" /></label>
+            <label class="field"><span>Stage</span><input name="stage" maxlength="80" placeholder="e.g. pT2 N1a M0" /></label>
+            <label class="field span-2"><span>Histopathology</span><input name="histopathology" maxlength="200" placeholder="e.g. Invasive ductal carcinoma" /></label>
+            <label class="field"><span>Consultant</span><input name="consultant" maxlength="80" /></label>
+            <label class="field"><span>Referred by</span><input name="referred_by" maxlength="80" /></label>
+            <label class="field"><span>Planned start</span><input name="start_date" type="date" /></label>
+            <label class="field"><span>Baseline weight (kg)</span><input name="baseline_weight_kg" type="number" min="2" max="400" step="0.1" /></label>
+            <label class="field"><span>Concurrent chemotherapy</span><select name="chemo_plan_id"><option value="">None</option></select></label>
+            <fieldset class="field span-3 day-picker"><legend>Treatment days</legend><div id="rtDays"></div></fieldset>
+          </div>
+          <div class="plan-cycle-setup">
+            <div class="section-row"><div><p class="eyebrow">Prescription</p><p class="muted">One row per phase. Dose per fraction in cGy (e.g. 270 for 2.7 Gy).</p></div><button class="button secondary small" type="button" data-rt="add-phase">+ Add phase</button></div>
+            <div id="rtPhaseRows" class="med-rows"></div>
+            <p class="rt-total" id="rtTotal"></p>
+          </div>
+          <details class="plan-cycle-setup rt-setup" id="rtSetupBlock"><summary><span class="eyebrow">Set-up data</span> <span class="muted">head rest, arm position, immobilisation, bladder, bolus</span></summary>
+            <div class="form-grid three">
+              <label class="field"><span>Head rest</span><select name="head_rest"><option value="">—</option><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
+              <label class="field"><span>Arm position</span><select name="arm_position"><option value="">—</option><option>Above head</option><option>By the side</option><option>On chest</option></select></label>
+              <label class="field"><span>Immobilisation</span><input name="immobilisation" list="rtImmobList" maxlength="80" /></label>
+              <label class="field"><span>Bladder</span><select name="bladder"><option value="">—</option><option>Empty</option><option>Half full</option><option>Full</option></select></label>
+              <label class="field"><span>Bolus</span><input name="bolus_cm" maxlength="40" placeholder="e.g. 0.5 cm or None" /></label>
+              <label class="field"><span>Knee rest</span><input name="knee_rest" maxlength="40" /></label>
+              <label class="field span-3"><span>Special instructions</span><input name="special_instructions" maxlength="300" /></label>
+            </div>
+          </details>
+          <label class="field top-gap"><span>Notes</span><textarea name="notes" rows="2" maxlength="2000"></textarea></label>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit" id="rtCourseSubmit">Save course</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Radiotherapy generic dialog (approve, constraints, phase plan data, status, reopen) -->
+    <div class="modal" id="rtDialog" role="dialog" aria-modal="true" aria-labelledby="rtDialogTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card large">
+        <div class="modal-heading"><div><p class="eyebrow" id="rtDialogEyebrow">Radiation oncology</p><h2 id="rtDialogTitle">Dialog</h2><p class="muted" id="rtDialogSub"></p></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="rtDialogForm" novalidate>
+          <div id="rtDialogBody"></div>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit" id="rtDialogSubmit">Save</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Weekly review -->
+    <div class="modal" id="rtReviewModal" role="dialog" aria-modal="true" aria-labelledby="rtReviewTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card preview-modal">
+        <div class="modal-heading"><div><p class="eyebrow">Early reactions during radiation therapy</p><h2 id="rtReviewTitle">Weekly review</h2><p class="muted" id="rtReviewSub"></p></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="rtReviewForm" novalidate>
+          <div class="form-grid three">
+            <label class="field"><span>Review date</span><input type="date" name="review_date" required /></label>
+            <label class="field"><span>Week</span><input type="number" name="week_number" min="1" max="20" step="1" /></label>
+            <label class="field"><span>Weight (kg)</span><input type="number" name="weight_kg" min="2" max="400" step="0.1" /><small class="muted" id="rtWeightNote"></small></label>
+          </div>
+          <div id="rtReviewRows" class="rt-review-rows"></div>
+          <fieldset class="rt-decisions"><legend>Decision for the coming week</legend><div id="rtDecisionOptions"></div></fieldset>
+          <div class="form-grid" id="rtDecisionReason">
+            <label class="field"><span>Reason category</span><select name="reason_category"><option value="">Select reason</option></select></label>
+            <label class="field"><span>Reviewed by</span><input name="reviewed_by" maxlength="80" /></label>
+            <label class="field span-2"><span>Clinical rationale / supportive care</span><textarea name="rationale" rows="2" maxlength="2000"></textarea></label>
+          </div>
+          <label class="field"><span>Notes</span><textarea name="notes" rows="2" maxlength="2000"></textarea></label>
+          <label class="confirm-check"><input type="checkbox" name="confirmed" /><span>I examined the patient, reviewed the displayed CTCAE criteria and confirm these grades.</span></label>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button danger-outline hidden" type="button" data-rt="delete-review">Delete</button><span class="spacer"></span><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit">Save and sign</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Records dialog (note, report upload, new discharge summary, finalise) -->
+    <div class="modal" id="recDialog" role="dialog" aria-modal="true" aria-labelledby="recDialogTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card large">
+        <div class="modal-heading"><div><p class="eyebrow" id="recDialogEyebrow">Patient record</p><h2 id="recDialogTitle">Dialog</h2><p class="muted" id="recDialogSub"></p></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="recDialogForm" novalidate>
+          <div id="recDialogBody"></div>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit" id="recDialogSubmit">Save</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- WhatsApp compose / approve -->
+    <div class="modal" id="waModal" role="dialog" aria-modal="true" aria-labelledby="waModalTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card large">
+        <div class="modal-heading"><div><p class="eyebrow">WhatsApp · clinician approval</p><h2 id="waModalTitle">Send on WhatsApp</h2><p class="muted" id="waModalSub"></p></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="waForm" novalidate>
+          <div id="waFormBody"></div>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit" id="waSubmit">Continue</button></div>
+        </form>
+      </div>
+    </div>
     <!-- Confirm -->
     <div class="modal" id="confirmModal" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
       <div class="modal-backdrop" data-close-modal></div>
@@ -389,6 +569,10 @@
 
     <div id="chartTooltip" class="chart-tooltip" hidden></div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <datalist id="rtImmobList"><option value="Aquaplast mask"><option value="Vacloc"><option value="Breast board"><option value="Knee-and-foot rest"><option value="Thermoplastic pelvic mould"></datalist>
     <script src="/app.js"></script>
+    <script src="/rt.js"></script>
+    <script src="/records.js"></script>
+    <script src="/whatsapp.js"></script>
   </body>
 </html>

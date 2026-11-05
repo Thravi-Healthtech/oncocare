@@ -773,13 +773,15 @@ def _seed_priya(connection: sqlite3.Connection, now: str) -> None:
 
 def _rt_course(connection, patient_id, now, *, site, site_group, laterality, diagnosis, stage, histopathology, intent, machine,
                consultant, treatment_days, setup, phases, constraints, start, chemo_plan_id=None, baseline_weight=None):
+    from datetime import date as _date, timedelta as _td
+    approved_at = (_date.fromisoformat(start) - _td(days=3)).isoformat() + "T10:30:00+00:00"
     course_id = connection.execute(
         """INSERT INTO rt_courses (patient_id, site, site_group, laterality, diagnosis, stage, histopathology, intent, machine, consultant,
                chemo_plan_id, status, start_date, treatment_days, baseline_weight_kg, setup_json, approved_physicist, approved_oncologist,
                approved_at, created_by, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (patient_id, site, site_group, laterality, diagnosis, stage, histopathology, intent, machine, consultant, chemo_plan_id, start,
-         treatment_days, baseline_weight, json.dumps(setup), "S. Iyer (physicist)", consultant, now, consultant, now, now)).lastrowid
+         treatment_days, baseline_weight, json.dumps(setup), "S. Iyer", consultant, approved_at, consultant, now, now)).lastrowid
     phase_ids = []
     for number, (name, technique, energy, target, dose, fractions, shift, ssd) in enumerate(phases, start=1):
         phase_ids.append(connection.execute(
@@ -791,7 +793,7 @@ def _rt_course(connection, patient_id, now, *, site, site_group, laterality, dia
         connection.execute("INSERT INTO rt_constraints (course_id, structure, constraint_text, achieved_text, met, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
                            (course_id, structure, constraint, achieved, met, order))
     connection.execute("INSERT INTO rt_events (course_id, kind, summary, actor, created_at) VALUES (?, 'approved', ?, ?, ?)",
-                       (course_id, f"Plan approved by {consultant} (radiation oncologist) and S. Iyer (physicist)", consultant, now))
+                       (course_id, f"Plan approved by {consultant} (radiation oncologist) and S. Iyer (physicist)", consultant, approved_at))
     return course_id, phase_ids
 
 

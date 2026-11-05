@@ -701,6 +701,9 @@ def list_reports(connection: sqlite3.Connection, patient_id: int | None = None, 
                 view["recorded"] = []
             view["context"] = patient_context(connection, row["patient_id"], max(row["onset_date"], row["created_at"][:10]), row["id"])
             view["treatment_plan_id"] = row["treatment_plan_id"]
+            rt_course = row_or_none(connection, "SELECT id FROM rt_courses WHERE patient_id = ? AND status IN ('planned', 'active', 'on_hold') ORDER BY id DESC LIMIT 1",
+                                    (row["patient_id"],))
+            view["rt_course_id"] = rt_course["id"] if rt_course else None
             view["patient_name"] = f"{row['first_name']} {row['last_name']}"
             view["medical_record_number"] = row["medical_record_number"]
         out.append(view)

@@ -69,9 +69,9 @@ async function start() {
   route();
 }
 async function refresh() {
-  const [plans, labs, reports, bank] = await Promise.all([api("/api/portal/plans"), api("/api/portal/labs"), api("/api/portal/reports"),
-    P.bank ? Promise.resolve(P.bank) : api("/api/portal/checkin/bank")]);
-  Object.assign(P, { plans, labs, reports, bank });
+  const [plans, labs, reports, bank, radiotherapy, summaries] = await Promise.all([api("/api/portal/plans"), api("/api/portal/labs"), api("/api/portal/reports"),
+    P.bank ? Promise.resolve(P.bank) : api("/api/portal/checkin/bank"), api("/api/portal/radiotherapy").catch(() => []), api("/api/portal/summaries").catch(() => [])]);
+  Object.assign(P, { plans, labs, reports, bank, radiotherapy, summaries });
   renderHome(); renderPlan(); renderReports(); renderHistory();
 }
 function route() {
@@ -87,6 +87,19 @@ function activePlan() { return P.plans.find(p => p.status === "active") || P.pla
 function renderHome() {
   const plan = activePlan();
   const cards = [];
+  const rt = (P.radiotherapy || []).find(c => ["In progress", "Paused by your doctor", "Planned"].includes(c.status));
+  if (rt) {
+    const pct = rt.sessions_total ? Math.round((rt.sessions_done / rt.sessions_total) * 100) : 0;
+    cards.push(`<article class="card hero">
+      <p class="eyebrow">Radiotherapy · ${esc(rt.status)}</p>
+      <div class="big">${rt.next_session ? `Next session ${fmtDate(rt.next_session, { weekday: "short", day: "numeric", month: "short" })}` : `${rt.sessions_done} of ${rt.sessions_total} sessions`}</div>
+      <p>${esc(rt.site)} · ${esc(rt.days)}</p>
+      <div class="progress" aria-label="${rt.sessions_done} of ${rt.sessions_total} sessions done"><span style="width:${pct}%"></span></div>
+      <p class="small">${rt.sessions_done} of ${rt.sessions_total} sessions done${rt.last_session ? ` · last session expected ${fmtDate(rt.last_session, { day: "numeric", month: "short" })}` : ""}</p>
+    </article>`);
+  }
+  const finalSummary = (P.summaries || [])[0];
+  if (finalSummary) cards.push(`<article class="card cta"><div><p class="eyebrow">From your doctor</p><h2>${esc(finalSummary.title)}</h2><p class="muted small">${finalSummary.follow_up?.date ? `Next visit ${fmtDate(finalSummary.follow_up.date)}` : `Finalised ${fmtDate(finalSummary.finalised_at)}`}</p></div><a class="button secondary" href="#plan">View</a></article>`);
   if (plan) {
     const next = plan.next_cycle;
     const pct = plan.cycles.length ? Math.round((plan.given / plan.cycles.length) * 100) : 0;
@@ -98,7 +111,7 @@ function renderHome() {
       <div class="progress" aria-label="${plan.given} of ${plan.cycles.length} cycles given"><span style="width:${pct}%"></span></div>
       <p class="small">${plan.given} of ${plan.cycles.length} cycles given</p>
     </article>`);
-  } else {
+  } else if (!rt) {
     cards.push(`<article class="card"><h2>No treatment plan yet</h2><p class="muted">Your care team will add your plan here.</p></article>`);
   }
   const replies = P.reports.filter(r => r.patient_message).slice(0, 1);
@@ -112,8 +125,23 @@ function renderHome() {
 
 /* ---------------------------------------------------------------- plan */
 function renderPlan() {
-  if (!P.plans.length) { $("#planContent").innerHTML = '<div class="empty">No treatment plan has been added yet.</div>'; return; }
-  $("#planContent").innerHTML = P.plans.map(plan => `<article class="card">
+  const rtCards = (P.radiotherapy || []).map(c => `<article class="card">
+      <div class="pills"><span class="pill ${c.status === "In progress" ? "ok" : c.status.startsWith("Paused") ? "warn" : ""}">${esc(c.status)}</span><span class="pill">${esc(c.days)}</span></div>
+      <h2 style="margin-top:10px">Radiotherapy · ${esc(c.site)}</h2>
+      <p class="muted small">${c.first_session ? `Started ${fmtDate(c.first_session)}` : "Not started yet"}</p>
+      <div class="drug-list">${c.parts.map(p => `<div><strong>${esc(p.name)}</strong><span>${p.done} of ${p.sessions} sessions</span></div>`).join("")}</div>
+      <div class="progress" aria-label="${c.sessions_done} of ${c.sessions_total} sessions"><span style="width:${c.sessions_total ? Math.round(c.sessions_done / c.sessions_total * 100) : 0}%"></span></div>
+      <p class="small">${c.sessions_done} of ${c.sessions_total} sessions done${c.next_session ? ` · next ${fmtDate(c.next_session, { weekday: "short", day: "numeric", month: "short" })}` : ""}${c.last_session ? ` · last expected ${fmtDate(c.last_session, { day: "numeric", month: "short" })}` : ""}</p>
+    </article>`).join("");
+  const docs = (P.summaries || []).map(d => `<article class="card">
+      <p class="eyebrow">From your doctor · ${fmtDate(d.finalised_at)}</p><h2>${esc(d.title)}</h2>
+      ${d.medications.length ? `<h3>Your medicines</h3><div class="drug-list">${d.medications.map(m => `<div><strong>${esc(m.name)} ${esc(m.dose || "")}</strong><span>${esc([m.frequency, m.duration ? `for ${m.duration}` : "", m.instructions].filter(Boolean).join(" · "))}</span></div>`).join("")}</div>` : ""}
+      ${d.advice ? `<h3>Advice</h3><p>${esc(d.advice)}</p>` : ""}
+      ${d.follow_up?.date ? `<p><strong>Next visit:</strong> ${fmtDate(d.follow_up.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}${d.follow_up.with ? ` with ${esc(d.follow_up.with)}` : ""}</p>` : ""}
+      <a class="button secondary" href="/api/portal/summaries/${d.id}/print" target="_blank" rel="noopener">View / download</a>
+    </article>`).join("");
+  if (!P.plans.length && !rtCards && !docs) { $("#planContent").innerHTML = '<div class="empty">No treatment plan has been added yet.</div>'; return; }
+  $("#planContent").innerHTML = docs + rtCards + P.plans.map(plan => `<article class="card">
       <div class="pills"><span class="pill ${plan.status === "active" ? "ok" : ""}">${esc(plan.status.replace("_", " "))}</span>${plan.cycle_interval_days ? `<span class="pill">every ${plan.cycle_interval_days} days</span>` : ""}</div>
       <h2 style="margin-top:10px">${esc(plan.regimen_name)}</h2>
       <p class="muted small">${plan.start_date ? `Started ${fmtDate(plan.start_date)}` : ""}</p>

@@ -19,6 +19,8 @@ const S = {
   searchSeq: 0,
 };
 const PLAN_VIEWS = ["cycles", "review", "labs", "toxicities", "timeline"];
+// Extension points used by rt.js (radiation oncology), records.js (summaries) and whatsapp.js.
+const EXT = { routes: {}, patientPanels: [], patientLoaders: [], navHref: {}, afterShow: [], patientRowChips: [] };
 const UNITS = ["mg/m2", "mg/kg", "mg", "AUC", "units/m2", "g/m2", "mcg/m2"];
 const STATUS_LABEL = { planned: "Planned", given: "Given", modified: "Modified", delayed: "Delayed", held: "Held", discontinued: "Discontinued", cancelled: "Cancelled" };
 const OUTCOME_LABEL = { given: "Given as planned", modified: "Given with modification", delayed: "Delayed", held: "Not given (held)", discontinued: "Plan discontinued" };
@@ -214,6 +216,7 @@ function reportCardHtml(r, { showPatient = false, actions = false, compact = fal
     <header>
       ${showPatient ? `<a class="report-patient" href="#patient/${r.patient_id}"><strong>${esc(r.patient_name)}</strong><small>${esc(r.medical_record_number)}</small></a>` : ""}
       <span class="chip ${statusTone}">${statusLabel}</span>
+      ${r.source === "whatsapp" ? '<span class="chip chip-wa">WhatsApp</span>' : ""}
       <span class="muted small">Sent ${fmtDateTime(r.created_at)} · ${r.input_mode === "voice" ? "🎤 voice" : "⌨ text"}${r.language ? ` · ${esc(r.language)}` : ""}${r.cycle_number ? ` · before C${r.cycle_number}` : ""}${r.onset_date ? ` · onset ${fmtShort(r.onset_date)}` : ""}</span>
     </header>
     ${r.red_flags.length ? `<div class="red-flags">${r.red_flags.map(f => `<span class="chip chip-alert" title="${esc(f.why)}">⚠ ${esc(f.label)}</span>`).join("")}<small>Patient was told to contact the care team or emergency services now.</small></div>` : ""}
@@ -239,13 +242,14 @@ function reportCardHtml(r, { showPatient = false, actions = false, compact = fal
     ${r.doctor_note ? `<div class="reply-line muted"><strong>Internal note:</strong> ${esc(r.doctor_note)}</div>` : ""}
     <footer>
       ${showPatient && r.treatment_plan_id ? `<a class="button primary small" href="#plan/${r.treatment_plan_id}/toxicities">Review in plan →</a>` : ""}
+      ${showPatient && r.rt_course_id ? `<a class="button ${r.treatment_plan_id ? "secondary" : "primary"} small" href="#rt/${r.rt_course_id}/weekly">Review in radiotherapy →</a>` : ""}
       ${actions ? (r.checkin?.items?.length ? `<button class="button secondary small" data-report-record="${r.id}">Add a different toxicity</button>`
         : `<button class="button ${r.status === "new" ? "primary" : "secondary"} small" data-report-record="${r.id}">${r.status === "new" ? "Review &amp; add as CTCAE toxicity" : "Add another toxicity"}</button>`) : ""}
       ${!compact ? `<button class="button secondary small" data-report-reply="${r.id}">${r.status === "new" ? "Reply / mark reviewed" : "Edit reply"}</button>` : ""}
       ${r.status === "new" && !compact ? `<button class="button secondary small" data-report-dismiss="${r.id}">Dismiss</button>` : ""}
     </footer>
     ${compact ? "" : `<form class="reply-form hidden" data-reply-form="${r.id}">
-      <label class="field"><span>Message to patient (shown in their portal)</span><textarea name="patient_message" rows="2" maxlength="1000" placeholder="e.g. Thank you. Please keep a note of it; we will review before your next cycle.">${esc(r.patient_message || "")}</textarea></label>
+      <label class="field"><span>Message to patient (${r.source === "whatsapp" ? "sent on WhatsApp and shown in their portal" : "shown in their portal"})</span><textarea name="patient_message" rows="2" maxlength="1000" placeholder="e.g. Thank you. Please keep a note of it; we will review before your next cycle.">${esc(r.patient_message || "")}</textarea></label>
       <label class="field"><span>Internal note (not shown to patient)</span><textarea name="doctor_note" rows="2" maxlength="2000">${esc(r.doctor_note || "")}</textarea></label>
       <div class="modal-actions"><button class="button secondary small" type="button" data-report-reply="${r.id}">Cancel</button><button class="button primary small" type="submit">Save and mark reviewed</button></div>
     </form>`}
@@ -285,6 +289,10 @@ async function route() {
   const [head, idRaw, tab] = location.hash.replace(/^#/, "").split("/");
   const id = Number(idRaw);
   try {
+    if (EXT.routes[head]) {
+      const view = await EXT.routes[head](id, tab, idRaw);
+      if (view) return show(view);
+    }
     if (head === "patient" && id) {
       if (S.patient?.id !== id) S.planId = null, S.L = null;
       await loadPatient(id);
@@ -307,14 +315,16 @@ async function route() {
 function show(view) {
   S.view = view;
   $$(".view").forEach(v => v.classList.toggle("active", v.dataset.view === view));
-  $("#navPatient").classList.toggle("hidden", !S.patient || view === "patients" || view === "inbox");
+  $("#navPatient").classList.toggle("hidden", !S.patient || ["patients", "inbox", "whatsapp"].includes(view));
   $("#navPlan").classList.toggle("hidden", !S.L || !PLAN_VIEWS.includes(view));
   $$(".nav-item").forEach(item => {
     const nav = item.dataset.nav;
     item.classList.toggle("active", nav === view);
     if (nav === "patient" && S.patient) item.href = `#patient/${S.patient.id}`;
     if (PLAN_VIEWS.includes(nav) && S.L) item.href = `#plan/${S.L.plan.id}/${nav}`;
+    if (EXT.navHref[nav]) item.href = EXT.navHref[nav]() || "#";
   });
+  EXT.afterShow.forEach(fn => fn(view));
   updateHeader();
   $(".sidebar").classList.remove("open");
   $("#mainContent").focus({ preventScroll: true });
@@ -322,7 +332,7 @@ function show(view) {
 }
 function updateHeader() {
   const p = view => S.view === view;
-  const patient = p("patients") || p("inbox") ? null : S.patient;
+  const patient = p("patients") || p("inbox") || p("whatsapp") ? null : S.patient;
   $("#selectedPatientAvatar").textContent = patient ? initials(patient) : "—";
   $("#selectedPatientName").textContent = patient ? patientName(patient) : "Select a patient";
   $("#selectedPatientMeta").textContent = patient ? `${patient.medical_record_number}${patient.diagnosis ? " · " + patient.diagnosis : ""}` : "Search or create a patient";
@@ -370,8 +380,8 @@ function renderPatients(search) {
       <button class="patient-row-open" data-open-patient="${p.id}" aria-label="Open ${esc(patientName(p))}">
         <span class="avatar">${esc(initials(p))}</span>
         <span class="patient-row-main"><strong>${esc(patientName(p))}${p.active ? "" : ' <em class="inactive-tag">Inactive</em>'}</strong><small>${esc(p.medical_record_number)}${p.phone ? ` · ☎ ${esc(p.phone)}` : ""}${a !== null ? ` · ${a} y` : ""}${p.sex ? ` · ${esc(p.sex)}` : ""}</small></span>
-        <span class="patient-row-detail"><span>${esc(p.diagnosis || "No diagnosis recorded")}</span><small>${p.active_regimen ? esc(p.active_regimen) : p.plan_count ? `${p.plan_count} plan(s)` : "No chemotherapy plan"}</small></span>
-        <span class="patient-row-signals">${p.open_reports ? `<span class="chip ${p.urgent_reports ? "chip-alert" : "chip-warn"}" title="Patient messages awaiting review">✉ ${p.open_reports}</span>` : ""}${next}${p.open_toxicity_grade ? gradeBadge(p.open_toxicity_grade, "small") : ""}</span>
+        <span class="patient-row-detail"><span>${esc(p.diagnosis || "No diagnosis recorded")}</span><small>${[p.active_regimen ? esc(p.active_regimen) : p.plan_count ? `${p.plan_count} plan(s)` : (p.active_rt_site ? "" : "No treatment plan"), p.active_rt_site ? `RT: ${esc(p.active_rt_site)}` : ""].filter(Boolean).join(" · ")}</small></span>
+        <span class="patient-row-signals">${EXT.patientRowChips.map(fn => fn(p)).join("")}${p.open_reports ? `<span class="chip ${p.urgent_reports ? "chip-alert" : "chip-warn"}" title="Patient messages awaiting review">✉ ${p.open_reports}</span>` : ""}${next}${p.open_toxicity_grade ? gradeBadge(p.open_toxicity_grade, "small") : ""}</span>
       </button>
       <div class="row-actions"><button class="icon-action" data-edit-patient="${p.id}" title="Edit patient" aria-label="Edit ${esc(patientName(p))}">✎</button><button class="icon-action danger" data-delete-patient="${p.id}" title="Delete patient" aria-label="Delete ${esc(patientName(p))}">🗑</button></div>
     </div>`;
@@ -427,6 +437,7 @@ async function loadPatient(id) {
   const [patient, portal, reports] = await Promise.all([
     api(`/api/patients/${id}`), api(`/api/patients/${id}/portal`).catch(() => null), api(`/api/patients/${id}/patient-reports`).catch(() => [])]);
   S.patient = { ...patient, portal, reports };
+  await Promise.all(EXT.patientLoaders.map(fn => Promise.resolve(fn(S.patient)).catch(() => null)));
   renderPatient();
 }
 function renderPatient() {
@@ -468,6 +479,7 @@ function renderPatient() {
           </div>`;
         }).join("") : '<div class="queue-empty">No chemotherapy plan yet. Create a plan to schedule cycles, drugs and doses.</div>'}
       </article>
+      ${EXT.patientPanels.map(fn => fn(p)).join("")}
     </div>`;
 }
 
@@ -1508,8 +1520,9 @@ document.addEventListener("submit", async event => {
   event.preventDefault();
   const v = Object.fromEntries(new FormData(form));
   try {
-    await patch(`/api/patient-reports/${form.dataset.replyForm}`, { status: findReport(form.dataset.replyForm)?.status === "recorded" ? "recorded" : "reviewed", patient_message: v.patient_message, doctor_note: v.doctor_note });
-    showToast(v.patient_message.trim() ? "Reviewed. The reply is now visible in the patient's portal." : "Marked as reviewed.");
+    const saved = await patch(`/api/patient-reports/${form.dataset.replyForm}`, { status: findReport(form.dataset.replyForm)?.status === "recorded" ? "recorded" : "reviewed", patient_message: v.patient_message, doctor_note: v.doctor_note });
+    const wa = saved?.whatsapp;
+    showToast(v.patient_message.trim() ? (wa ? (wa.status === "sent" ? "Reviewed. The reply was sent on WhatsApp and is in the patient's portal." : `Reviewed. WhatsApp send failed: ${wa.error || wa.status}. The reply is in the patient's portal.`) : "Reviewed. The reply is now visible in the patient's portal.") : "Marked as reviewed.");
     await afterReportChange();
   } catch (e) { showToast(e.message); }
 });
@@ -1548,7 +1561,7 @@ $("#patientSearch").addEventListener("input", () => { clearTimeout(searchTimer);
 $("#patientStatusFilter").addEventListener("change", loadPatients);
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeModals(); });
 document.addEventListener("mousemove", moveTooltip);
-window.addEventListener("hashchange", route);
+window.addEventListener("hashchange", () => { closeModals(); route(); });
 
 function clinicianName() { return S.me?.name || ""; }
 function showDoctorLogin() {

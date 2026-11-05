@@ -456,7 +456,8 @@ def rules_narrative(facts: dict[str, Any]) -> str:
     who = f"{p['first_name']} {p['last_name']}"
     if p.get("age") is not None:
         who += f", a {p['age']}-year-old" + (f" {p['sex']}" if p.get("sex") in ("female", "male") else "") + ","
-    sentences = [f"{who} is under treatment for {p['diagnosis'] or 'a diagnosis not recorded'}. [S0]"]
+    verb = "was treated for" if facts["period"]["to"] else "is under treatment for"
+    sentences = [f"{who} {verb} {p['diagnosis'] or 'a diagnosis not recorded'}. [S0]"]
     for plan in facts["chemotherapy"]:
         ids = _sid(items, type="cycle", plan_id=plan["plan_id"])
         if plan["cycles_given"]:
