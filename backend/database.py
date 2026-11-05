@@ -452,6 +452,7 @@ ADDED_COLUMNS = {
     "patients": [("phone", "TEXT"), ("preferred_language", "TEXT"), ("wa_opt_in", "INTEGER NOT NULL DEFAULT 0"),
                  ("wa_opt_in_at", "TEXT"), ("wa_opt_in_method", "TEXT")],
     "patient_reports": [("checkin_json", "TEXT"), ("ui_language", "TEXT"), ("source", "TEXT NOT NULL DEFAULT 'portal'")],
+    "whatsapp_messages": [("meta_json", "TEXT")],
 }
 
 # Development clinician account (password comes from ONCOCARE_DEV_PASSWORD until OTP login is added).

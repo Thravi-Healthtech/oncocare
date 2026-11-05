@@ -22,11 +22,12 @@ import re
 import sqlite3
 import urllib.error
 import urllib.request
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from . import portal, questionnaire, voice_answers
+from . import agent, portal, questionnaire, speech, voice_answers
 from . import radiotherapy as rt
 from .database import normalise_phone, row_or_none, rows, transaction, utc_now
 from .errors import ApiError
@@ -68,6 +69,7 @@ def status() -> dict[str, Any]:
     return {"mode": m, "live_ready": live_ready(), "display_number": _env("WHATSAPP_DISPLAY_NUMBER") or None, "clinic": clinic(),
             "care_phone": care_phone() or None, "webhook_path": "/api/whatsapp/webhook", "template_language": _env("WHATSAPP_TEMPLATE_LANG", "en"),
             "webhook_signed": bool(_env("WHATSAPP_APP_SECRET")), "verify_token_set": bool(_env("WHATSAPP_VERIFY_TOKEN")),
+            "agent": "AI agent (guarded)" if agent.available() else "Rule-based (AI off)", "speech": speech.status(),
             "note": None if m == "simulator" or live_ready() else "WHATSAPP_MODE=live but WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID are not set; sends will fail."}
 
 
@@ -130,6 +132,19 @@ TEXT: dict[str, dict[str, str]] = {
         "en": "This number is not registered with {clinic}. Please contact the hospital to link your WhatsApp number to your record. In an emergency call 112.",
         "hi": "यह नंबर {clinic} में पंजीकृत नहीं है। अपना WhatsApp नंबर अपने रिकॉर्ड से जोड़ने के लिए अस्पताल से संपर्क करें। इमरजेंसी में 112 पर कॉल करें।",
         "te": "ఈ నంబర్ {clinic} లో నమోదు కాలేదు. మీ WhatsApp నంబర్‌ను మీ రికార్డుకు జత చేయడానికి ఆసుపత్రిని సంప్రదించండి. అత్యవసరమైతే 112 కి కాల్ చేయండి."},
+    "menu": {"en": "Hello from {clinic}. How can we help? Choose an option, or just type or send a voice note.",
+             "hi": "{clinic} की ओर से नमस्ते। हम कैसे मदद करें? एक विकल्प चुनें, या लिखें या वॉइस नोट भेजें।",
+             "te": "{clinic} నుండి నమస్కారం. మేము ఎలా సహాయం చేయగలం? ఒక ఎంపికను ఎంచుకోండి, లేదా టైప్ చేయండి లేదా వాయిస్ నోట్ పంపండి."},
+    "complaint_prompt": {"en": "Please describe your complaint in your own words. You can type it or send a voice note.",
+                         "hi": "कृपया अपनी शिकायत अपने शब्दों में बताइए। आप लिख सकते हैं या वॉइस नोट भेज सकते हैं।",
+                         "te": "దయచేసి మీ ఫిర్యాదును మీ మాటల్లో చెప్పండి. టైప్ చేయవచ్చు లేదా వాయిస్ నోట్ పంపవచ్చు."},
+    "will_ask": {"en": "I understood: {symptoms}. I will ask a few short questions so your doctor can assess this.",
+                 "hi": "मैंने समझा: {symptoms}। डॉक्टर के आकलन के लिए मैं कुछ छोटे सवाल पूछूँगा।",
+                 "te": "నాకు అర్థమైంది: {symptoms}. డాక్టర్ అంచనా కోసం కొన్ని చిన్న ప్రశ్నలు అడుగుతాను."},
+    "answer_hint": {"en": "Reply with the number, or say it in your own words.", "hi": "नंबर भेजें, या अपने शब्दों में बताइए।",
+                    "te": "సంఖ్యను పంపండి, లేదా మీ మాటల్లో చెప్పండి."},
+    "schedule_head": {"en": "Your schedule at {clinic}:", "hi": "{clinic} में आपका शेड्यूल:", "te": "{clinic} లో మీ షెడ్యూల్:"},
+    "no_plan": {"en": "No treatment is scheduled at the moment.", "hi": "अभी कोई इलाज निर्धारित नहीं है।", "te": "ప్రస్తుతం ఎలాంటి చికిత్స షెడ్యూల్ లేదు."},
     "skip": {"en": "Reply 0 to skip.", "hi": "छोड़ने के लिए 0 भेजें।", "te": "వదిలేయడానికి 0 పంపండి."},
     "temp": {"en": "Reply with the highest temperature in °C (for example 38.2), or 0 if you did not measure it.",
              "hi": "सबसे ज़्यादा तापमान °C में भेजें (जैसे 38.2), या नापा नहीं तो 0 भेजें।",
@@ -143,8 +158,10 @@ DATE_OPTIONS = [  # (label en/hi/te, days ago)
 ]
 STOP_WORDS = {"stop", "unsubscribe", "रोकें", "बंद", "ఆపు", "ఆపండి"}
 START_WORDS = {"start", "subscribe", "शुरू", "ప్రారంభించు"}
-HELP_WORDS = {"help", "menu", "मदद", "సహాయం"}
-CHECK_WORDS = {"check", "check-in", "checkin", "जाँच", "చెక్"}
+HELP_WORDS = {"help", "मदद", "సహాయం"}
+CHECK_WORDS = {"check", "check-in", "checkin", "symptom check-in", "जाँच", "చెక్"}
+MENU_WORDS = {"menu", "options", "मेनू", "మెనూ"}
+GREETING_WORDS = {"hi", "hello", "hey", "namaste", "namaskar", "नमस्ते", "నమస్తే", "నమస్కారం", "హాయ్"}
 
 
 def t(key: str, lang: str, **kw: Any) -> str:
@@ -486,16 +503,70 @@ def deliver(db: str, message_id: int) -> dict[str, Any]:
         return _message(connection, message_id)
 
 
-def _bot(connection: sqlite3.Connection, patient_id: int | None, body: str, kind: str = "bot", wa_from: str | None = None) -> None:
-    """Fixed automatic reply. Sent immediately (within the 24-hour window opened by the patient's message)."""
-    message_id = _store(connection, patient_id, "out", kind, body, "draft", wa_from=wa_from)
-    channel = mode()
-    if channel == "live":
+MEDIA_DIR: Path | None = None  # set by the API handler: <upload dir>/whatsapp
+
+
+def _media_dir() -> Path:
+    folder = (MEDIA_DIR or Path("uploads") / "whatsapp")
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def _upload_media_live(path: Path, content_type: str) -> str:
+    """Upload a file to WhatsApp media storage; returns the media id."""
+    boundary = uuid.uuid4().hex
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"messaging_product\"\r\n\r\nwhatsapp\r\n"
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"type\"\r\n\r\n{content_type}\r\n"
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{path.name}\"\r\nContent-Type: {content_type}\r\n\r\n").encode()
+    body += path.read_bytes() + f"\r\n--{boundary}--\r\n".encode()
+    version = _env("WHATSAPP_API_VERSION", "v21.0")
+    req = urllib.request.Request(f"https://graph.facebook.com/{version}/{_env('WHATSAPP_PHONE_NUMBER_ID')}/media", data=body, method="POST",
+                                 headers={"Authorization": f"Bearer {_env('WHATSAPP_TOKEN')}", "Content-Type": f"multipart/form-data; boundary={boundary}"})
+    with urllib.request.urlopen(req, timeout=60) as response:
+        return json.loads(response.read()).get("id", "")
+
+
+def _speak(body: str, lang: str) -> tuple[str, str] | None:
+    """Spoken copy of a reply (Sarvam TTS) saved under the media folder; None when speech is off or fails."""
+    if not speech.status()["enabled"]:
+        return None
+    try:
+        audio, content_type = speech.synthesize(re.sub(r"https?://\S+", "", body), lang)
+    except Exception:
+        return None
+    path = _media_dir() / f"tts-{uuid.uuid4().hex}{'.mp3' if content_type == 'audio/mpeg' else '.wav'}"
+    path.write_bytes(audio)
+    return str(path), content_type
+
+
+def _bot(connection: sqlite3.Connection, patient_id: int | None, body: str, kind: str = "bot", wa_from: str | None = None,
+         buttons: list[dict[str, str]] | None = None, meta: dict[str, Any] | None = None, voice_lang: str | None = None) -> int:
+    """Automatic reply (fixed text or guarded agent text), sent at once inside the 24-hour window the patient opened.
+    `buttons` become WhatsApp reply buttons (max 3); `voice_lang` adds a spoken copy when speech is configured."""
+    media = _speak(body, voice_lang) if voice_lang else None
+    meta = dict(meta or {})
+    if voice_lang:
+        meta["voice"] = voice_lang
+    message_id = _store(connection, patient_id, "out", kind, body, "draft", wa_from=wa_from,
+                        buttons_json=json.dumps(buttons, ensure_ascii=False) if buttons else None,
+                        meta_json=json.dumps(meta, ensure_ascii=False) if meta else None,
+                        media_path=media[0] if media else None, media_type=media[1] if media else None)
+    if mode() == "live":
         to = wa_from
+        if not to and patient_id:
+            to = wa_number((row_or_none(connection, "SELECT phone FROM patients WHERE id = ?", (patient_id,)) or {}).get("phone"))
         try:
-            reply = _graph(f"{_env('WHATSAPP_PHONE_NUMBER_ID')}/messages",
-                           {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"body": body[:4096]}})
+            if buttons:
+                payload = {"messaging_product": "whatsapp", "to": to, "type": "interactive",
+                           "interactive": {"type": "button", "body": {"text": body[:1024]},
+                                           "action": {"buttons": [{"type": "reply", "reply": {"id": b["id"], "title": b["title"][:20]}} for b in buttons[:3]]}}}
+            else:
+                payload = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"body": body[:4096]}}
+            reply = _graph(f"{_env('WHATSAPP_PHONE_NUMBER_ID')}/messages", payload)
             wamid = (reply.get("messages") or [{}])[0].get("id")
+            if media:
+                media_id = _upload_media_live(Path(media[0]), media[1])
+                _graph(f"{_env('WHATSAPP_PHONE_NUMBER_ID')}/messages", {"messaging_product": "whatsapp", "to": to, "type": "audio", "audio": {"id": media_id}})
             connection.execute("UPDATE whatsapp_messages SET status = 'sent', wa_message_id = ?, sent_at = ?, updated_at = ? WHERE id = ?",
                                (wamid, utc_now(), utc_now(), message_id))
         except Exception as error:
@@ -503,6 +574,7 @@ def _bot(connection: sqlite3.Connection, patient_id: int | None, body: str, kind
     else:
         connection.execute("UPDATE whatsapp_messages SET status = 'sent', wa_message_id = ?, sent_at = ?, updated_at = ? WHERE id = ?",
                            (f"sim-{message_id}", utc_now(), utc_now(), message_id))
+    return message_id
 
 
 def send_report_reply(db: str, report_id: int, actor: str, upload_dir: Path | None = None) -> dict[str, Any] | None:
@@ -562,10 +634,10 @@ def _message(connection: sqlite3.Connection, message_id: int) -> dict[str, Any]:
     msg["kind_label"] = OUT_KINDS.get(msg["kind"], {"bot": "Automatic reply", "complaint": "Patient message", "answer": "Patient answer",
                                                     "voice": "Voice note", "command": "Patient command"}.get(msg["kind"], msg["kind"]))
     msg["template_params"] = json.loads(msg.pop("template_params_json") or "null")
-    msg["has_audio"] = False
-    if msg["report_id"] and msg["direction"] == "in":
-        report = row_or_none(connection, "SELECT audio_path FROM patient_reports WHERE id = ?", (msg["report_id"],))
-        msg["has_audio"] = bool(report and report["audio_path"] and msg["kind"] == "voice")
+    msg["meta"] = json.loads(msg.pop("meta_json") or "null")
+    msg["buttons"] = json.loads(msg.pop("buttons_json") or "null")
+    msg["has_audio"] = bool(msg["media_path"])
+    msg.pop("media_path", None)
     return msg
 
 
@@ -599,14 +671,23 @@ def threads(db: str) -> list[dict[str, Any]]:
 def media_file(db: str, message_id: int, upload_dir: Path) -> Any:
     from .routes_ext import RawResponse
     with transaction(db) as connection:
-        msg = row_or_none(connection, "SELECT report_id FROM whatsapp_messages WHERE id = ?", (message_id,))
-        if not msg or not msg["report_id"]:
-            raise ApiError(404, "No media")
-        path, content_type = portal.audio_for(connection, msg["report_id"])
-    return RawResponse(str(path).encode(), "file:" + content_type, None)
+        msg = row_or_none(connection, "SELECT media_path, media_type FROM whatsapp_messages WHERE id = ?", (message_id,))
+    if not msg or not msg["media_path"]:
+        raise ApiError(404, "No media")
+    return RawResponse(str(msg["media_path"]).encode(), "file:" + (msg["media_type"] or "application/octet-stream"), None)
 
 
-# ---------------------------------------------------------------------------------------------- inbound conversation
+# ---------------------------------------------------------------------------------------------- inbound conversation (agent)
+MENU_IDS = ("menu_complaint", "menu_checkin", "menu_schedule")
+
+
+def menu_buttons(lang: str) -> list[dict[str, str]]:
+    titles = {"en": ("Register complaint", "Symptom check-in", "My schedule"),
+              "hi": ("शिकायत दर्ज करें", "लक्षण जाँच", "मेरा शेड्यूल"),
+              "te": ("ఫిర్యాదు నమోదు", "లక్షణాల తనిఖీ", "నా షెడ్యూల్")}[lang if lang in LANGS else "en"]
+    return [{"id": i, "title": title} for i, title in zip(MENU_IDS, titles)]
+
+
 def _session(connection: sqlite3.Connection, patient_id: int) -> dict[str, Any] | None:
     row = row_or_none(connection, "SELECT state_json FROM whatsapp_sessions WHERE patient_id = ?", (patient_id,))
     return json.loads(row["state_json"]) if row else None
@@ -633,7 +714,6 @@ def _queue(keys: list[str]) -> list[list[str]]:
 
 def _question_text(key: str, qid: str, lang: str, first_safety: bool) -> str:
     q = voice_answers.find_question(key, qid)
-    head = ""
     if key == "safety":
         head = (t("safety", lang) + "\n\n") if first_safety else ""
     else:
@@ -643,7 +723,7 @@ def _question_text(key: str, qid: str, lang: str, first_safety: bool) -> str:
     text = q["text"].get(lang) or q["text"]["en"]
     if q["type"] == "choice":
         options = "\n".join(f"{i}. {o['label'].get(lang) or o['label']['en']}" for i, o in enumerate(q["options"], start=1))
-        return f"{head}{text}\n{options}"
+        return f"{head}{text}\n{options}\n{t('answer_hint', lang)}"
     if q["type"] == "date":
         options = "\n".join(f"{i}. {label.get(lang) or label['en']}" for i, (label, _) in enumerate(DATE_OPTIONS, start=1))
         return f"{head}{text}\n{options}\n{t('skip', lang)}"
@@ -651,7 +731,8 @@ def _question_text(key: str, qid: str, lang: str, first_safety: bool) -> str:
 
 
 def _interpret(key: str, qid: str, reply: str, lang: str) -> tuple[bool, Any]:
-    """(understood, value). value None with understood=True means 'skipped'."""
+    """(understood, value). value None with understood=True means 'skipped'. Numbers first, then the spoken-answer rules
+    (which also understand words such as 'three times', 'yesterday', 'హాయ్ లేదు'), then Claude when AI is on."""
     q = voice_answers.find_question(key, qid)
     text = reply.strip()
     number = re.fullmatch(r"\s*(\d{1,2})\s*[.)]?\s*", text)
@@ -670,14 +751,17 @@ def _interpret(key: str, qid: str, reply: str, lang: str) -> tuple[bool, Any]:
     return (result["value"] is not None), result["value"]
 
 
-def _submit(connection: sqlite3.Connection, db: str, patient_id: int, state: dict[str, Any], upload_dir: Path | None, partial: bool = False) -> dict[str, Any] | None:
+def _submit(connection: sqlite3.Connection, db: str, patient_id: int, state: dict[str, Any], upload_dir: Path | None, partial: bool = False,
+            audio: tuple[bytes, str] | None = None, prefix: str = "") -> dict[str, Any] | None:
     """Turn the conversation into one patient report (structured check-in when complete, free text otherwise)."""
     _save_session(connection, patient_id, None)
-    text = state.get("text") or ""
+    text = (prefix + (state.get("text") or "")).strip()
     safety = state.get("safety") or {}
-    complete = bool(state.get("keys") is not None) and all(safety.get(q["id"]) for q in questionnaire.SAFETY_QUESTIONS)
-    payload: dict[str, Any] = {"text": text, "input_mode": "text", "language": state.get("lang"), "ui_language": state.get("lang"),
-                               "_sync_triage": SYNC_TRIAGE}
+    complete = bool(state.get("keys")) and all(safety.get(q["id"]) for q in questionnaire.SAFETY_QUESTIONS)
+    payload: dict[str, Any] = {"text": text, "input_mode": "voice" if state.get("voice") or audio else "text", "language": state.get("lang"),
+                               "ui_language": state.get("lang") if state.get("lang") in questionnaire.LANGS else None, "_sync_triage": SYNC_TRIAGE}
+    if audio:
+        payload.update({"audio_base64": base64.b64encode(audio[0]).decode(), "audio_type": audio[1]})
     if complete:
         payload["checkin"] = {"symptoms": state.get("keys") or [], "answers": state.get("answers") or {}, "safety": safety}
     else:
@@ -695,10 +779,9 @@ def _submit(connection: sqlite3.Connection, db: str, patient_id: int, state: dic
             answered.append("(patient stopped answering; questions incomplete)")
         if answered:
             payload["text"] = (text + "\n\nWhatsApp answers: " + "; ".join(answered))[:3900]
-    if not payload["text"].strip() and not payload.get("checkin"):
+    if not payload["text"].strip() and not payload.get("checkin") and not audio:
         return None
-    # The report insert opens its own transaction; commit ours first.
-    connection.commit()
+    connection.commit()  # create_report opens its own transaction
     report = portal.create_report(db, patient_id, payload, upload_dir or Path("uploads"))
     connection.execute("UPDATE patient_reports SET source = 'whatsapp' WHERE id = ?", (report["id"],))
     for message_id in state.get("message_ids") or []:
@@ -706,116 +789,186 @@ def _submit(connection: sqlite3.Connection, db: str, patient_id: int, state: dic
     return report
 
 
-def _emergency_once(connection: sqlite3.Connection, patient_id: int, state: dict[str, Any] | None, lang: str) -> None:
+def _emergency_once(connection: sqlite3.Connection, patient_id: int, state: dict[str, Any] | None, lang: str, voice: bool = False) -> None:
     if state is not None and state.get("emergency_sent"):
         return
-    _bot(connection, patient_id, t("emergency", lang), "bot")
+    _bot(connection, patient_id, t("emergency", lang), "bot", voice_lang=lang if voice else None)
     if state is not None:
         state["emergency_sent"] = True
 
 
+def record_facts(connection: sqlite3.Connection, patient: dict[str, Any]) -> str:
+    """What the agent may quote: treatment schedule, prescribed medicines, next visit, clinic contacts."""
+    lines = [f"Patient first name: {patient['first_name']}", f"Clinic: {clinic()}", f"Care team phone: {care_phone() or 'not given; emergency 112'}",
+             f"Today: {date.today().isoformat()}"]
+    try:
+        lines.append("Treatment:\n" + _plan_text(connection, patient, "en"))
+    except ApiError:
+        lines.append("Treatment: no active treatment plan recorded")
+    summary = row_or_none(connection, "SELECT content_json, finalised_at FROM discharge_summaries WHERE patient_id = ? AND status = 'final' ORDER BY finalised_at DESC LIMIT 1",
+                          (patient["id"],))
+    if summary:
+        content = json.loads(summary["content_json"])
+        if content.get("medications"):
+            lines.append("Medicines prescribed (quote exactly):\n" + _medicines_text(content["medications"]))
+        fu = content.get("follow_up") or {}
+        if fu.get("date"):
+            lines.append(f"Follow-up visit: {_fmt_day(fu['date'])}" + (f" with {fu['with']}" if fu.get("with") else ""))
+        if content.get("advice"):
+            lines.append(f"Doctor's written advice (quote only): {content['advice']}")
+    for r in rows(connection, "SELECT body, scheduled_for FROM whatsapp_messages WHERE patient_id = ? AND kind = 'reminder' AND status IN ('scheduled', 'sent') "
+                              "ORDER BY scheduled_for DESC LIMIT 2", (patient["id"],)):
+        lines.append(f"Visit reminder on record: {r['body'][:200]}")
+    return "\n".join(lines)
+
+
+def _history(connection: sqlite3.Connection, patient_id: int) -> list[dict[str, str]]:
+    msgs = rows(connection, "SELECT direction, body FROM whatsapp_messages WHERE patient_id = ? AND status NOT IN ('draft', 'cancelled') ORDER BY created_at DESC, id DESC LIMIT 8",
+                (patient_id,))
+    return [{"role": "patient" if m["direction"] == "in" else "clinic", "text": m["body"]} for m in reversed(msgs)]
+
+
+def _schedule_text(connection: sqlite3.Connection, patient: dict[str, Any], lang: str) -> str:
+    try:
+        plan = _plan_text(connection, patient, lang)
+    except ApiError:
+        plan = t("no_plan", lang)
+    facts = record_facts(connection, patient)
+    follow = next((line for line in facts.splitlines() if line.startswith("Follow-up visit:")), "")
+    return f"{t('schedule_head', lang)}\n\n{plan}" + (f"\n\n{follow}" if follow else "")
+
+
+def _labels(keys: list[str], lang: str) -> str:
+    return ", ".join((questionnaire.SYMPTOMS[k]["label"].get(lang) or questionnaire.SYMPTOMS[k]["label"]["en"]) for k in keys)
+
+
+def _start_questions(connection: sqlite3.Connection, pid: int, state: dict[str, Any], lang: str, voice: bool) -> dict[str, Any]:
+    state.update({"stage": "questions", "queue": _queue(state["keys"]), "answers": {}, "safety": {}, "retries": 0, "asked_safety": False})
+    key, qid = state["queue"][0]
+    _save_session(connection, pid, state)
+    _bot(connection, pid, _question_text(key, qid, lang, False), voice_lang=lang if voice else None)
+    return {"action": "question", "question": [key, qid]}
+
+
+def _transcribe(audio: tuple[bytes, str], client_transcript: str | None) -> tuple[str | None, str | None, str]:
+    """(text, detected lang, method)."""
+    if speech.status()["enabled"]:
+        try:
+            out = speech.transcribe(*audio)
+            if out["text"]:
+                return out["text"], out["lang"], "sarvam"
+        except Exception:
+            pass
+    if client_transcript and client_transcript.strip():
+        return client_transcript.strip()[:2000], None, "browser"
+    return None, None, "none"
+
+
 def receive(db: str, wa_from: str, text: str | None = None, audio: tuple[bytes, str] | None = None, upload_dir: Path | None = None,
-            wa_message_id: str | None = None, channel: str | None = None) -> dict[str, Any]:
+            wa_message_id: str | None = None, channel: str | None = None, button_id: str | None = None,
+            client_transcript: str | None = None) -> dict[str, Any]:
     """Handle one inbound WhatsApp message (from the webhook or the simulator)."""
     text = (text or "").strip()[:4000]
     digits = normalise_phone(wa_from)
+    transcript_method = None
+    if audio:
+        heard, heard_lang, transcript_method = _transcribe(audio, client_transcript)
+        text = heard or ""
     with transaction(db) as connection:
         if wa_message_id and row_or_none(connection, "SELECT 1 FROM whatsapp_messages WHERE wa_message_id = ?", (wa_message_id,)):
             return {"duplicate": True}
         patient = row_or_none(connection, "SELECT * FROM patients WHERE phone = ?", (digits,)) if digits else None
         lang = _lang(patient, text)
+        if audio and transcript_method == "sarvam" and heard_lang in LANGS:
+            lang = heard_lang
+        voice = bool(audio)
+        media_path = None
+        if audio:
+            path = _media_dir() / f"in-{uuid.uuid4().hex}{speech.AUDIO_EXT.get(audio[1], '.ogg')}"
+            path.write_bytes(audio[0])
+            media_path = str(path)
         if not patient:
             _store(connection, None, "in", "complaint", text or "(voice note)", "received", wa_from=wa_from, wa_message_id=wa_message_id,
-                   channel=channel or mode())
+                   channel=channel or mode(), media_path=media_path, media_type=audio[1] if audio else None)
             _bot(connection, None, t("unknown", lang), "bot", wa_from=wa_from)
             return {"matched": False}
         pid = patient["id"]
         if lang != "en" and not patient["preferred_language"]:
             connection.execute("UPDATE patients SET preferred_language = ? WHERE id = ?", (lang, pid))
+        state = _session(connection, pid)
         word = text.lower().strip(" .!")
-        kind = "voice" if audio else "command" if word in STOP_WORDS | START_WORDS | HELP_WORDS | CHECK_WORDS else "answer" if _session(connection, pid) else "complaint"
-        in_id = _store(connection, pid, "in", kind, text or "🎤 Voice note", "received", wa_from=wa_from, wa_message_id=wa_message_id, channel=channel or mode())
-        result: dict[str, Any] = {"matched": True, "patient_id": pid, "message_id": in_id}
+        if not button_id and state and state.get("stage") == "menu" and word in ("1", "2", "3"):
+            button_id = MENU_IDS[int(word) - 1]
+        if button_id and button_id not in MENU_IDS:
+            button_id = None
+        kind = "voice" if audio else "button" if button_id else "command" if word in STOP_WORDS | START_WORDS | HELP_WORDS | CHECK_WORDS | MENU_WORDS else \
+            "answer" if state and state.get("stage") == "questions" else "complaint"
+        shown = text or ("🎤 Voice note" if audio else "")
+        if button_id and not text:
+            shown = next(b["title"] for b in menu_buttons(lang) if b["id"] == button_id)
+        meta = {"transcribed": transcript_method} if audio else None
+        in_id = _store(connection, pid, "in", kind, shown, "received", wa_from=wa_from, wa_message_id=wa_message_id, channel=channel or mode(),
+                       media_path=media_path, media_type=audio[1] if audio else None, meta_json=json.dumps(meta) if meta else None)
+        result: dict[str, Any] = {"matched": True, "patient_id": pid, "message_id": in_id, "transcript": text if audio else None}
+        say = lambda body, k="bot", buttons=None, m=None: _bot(connection, pid, body, k, buttons=buttons, meta=m, voice_lang=lang if voice else None)  # noqa: E731
 
+        # Commands
         if word in STOP_WORDS:
             connection.execute("UPDATE patients SET wa_opt_in = 0, wa_opt_in_at = ?, wa_opt_in_method = 'patient_stop' WHERE id = ?", (utc_now(), pid))
             connection.execute("UPDATE whatsapp_messages SET status = 'cancelled', updated_at = ? WHERE patient_id = ? AND status = 'scheduled'", (utc_now(), pid))
             _save_session(connection, pid, None)
-            _bot(connection, pid, t("optout", lang))
+            say(t("optout", lang))
             return result | {"action": "opt_out"}
         if word in START_WORDS:
             connection.execute("UPDATE patients SET wa_opt_in = 1, wa_opt_in_at = ?, wa_opt_in_method = 'patient_whatsapp' WHERE id = ?", (utc_now(), pid))
-            _bot(connection, pid, t("optin", lang))
+            _save_session(connection, pid, {"stage": "menu", "lang": lang})
+            say(t("optin", lang), buttons=menu_buttons(lang))
             return result | {"action": "opt_in"}
-        if word in HELP_WORDS:
-            _bot(connection, pid, t("help", lang))
-            return result | {"action": "help"}
-
-        if audio:
-            data, content_type = audio
-            connection.commit()
-            report = portal.create_report(db, pid, {"text": text, "input_mode": "voice", "audio_base64": base64.b64encode(data).decode(),
-                                                    "audio_type": content_type, "language": lang, "_sync_triage": SYNC_TRIAGE}, upload_dir or Path("uploads"))
-            connection.execute("UPDATE patient_reports SET source = 'whatsapp' WHERE id = ?", (report["id"],))
-            connection.execute("UPDATE whatsapp_messages SET report_id = ? WHERE id = ?", (report["id"], in_id))
-            _bot(connection, pid, t("voice", lang))
-            if not patient["wa_opt_in"]:
-                _bot(connection, pid, t("not_opted", lang))
-            return result | {"action": "voice_report", "report_id": report["id"]}
-
-        state = _session(connection, pid)
+        if word in HELP_WORDS | MENU_WORDS:
+            _save_session(connection, pid, {"stage": "menu", "lang": lang})
+            say(t("menu", lang), buttons=menu_buttons(lang))
+            return result | {"action": "menu"}
         if word in CHECK_WORDS:
-            _save_session(connection, pid, {"stage": "describe", "lang": lang, "text": "", "message_ids": []})
-            _bot(connection, pid, t("describe", lang))
+            button_id = "menu_checkin"
+
+        # Menu choices
+        if button_id == "menu_complaint":
+            _save_session(connection, pid, {"stage": "complaint", "lang": lang, "message_ids": [in_id]})
+            say(t("complaint_prompt", lang))
+            return result | {"action": "complaint_prompt"}
+        if button_id == "menu_checkin":
+            _save_session(connection, pid, {"stage": "describe", "lang": lang, "text": "", "message_ids": [in_id]})
+            say(t("describe", lang))
             return result | {"action": "check_start"}
-
-        if state and state.get("stage") == "describe":
-            state = None  # fall through: this text is the description
+        if button_id == "menu_schedule":
             _save_session(connection, pid, None)
+            say(_schedule_text(connection, patient, lang), buttons=menu_buttons(lang))
+            return result | {"action": "schedule"}
 
-        if not state:
-            flags = portal.detect_red_flags(text, [], None, None)
-            detected = portal.detect_symptoms(text)["symptoms"] if text else []
-            if flags or not detected:
-                connection.commit()
-                report = _submit(connection, db, pid, {"text": text, "lang": lang, "message_ids": [in_id], "keys": None}, upload_dir)
-                if flags:
-                    _bot(connection, pid, t("emergency", lang))
-                _bot(connection, pid, t("ack", lang) + ("" if flags else "\n\n" + t("hint", lang)))
-                if not patient["wa_opt_in"]:
-                    _bot(connection, pid, t("not_opted", lang))
-                return result | {"action": "report", "report_id": report["id"] if report else None, "red_flags": [f["code"] for f in flags]}
-            labels = ", ".join((questionnaire.SYMPTOMS[k]["label"].get(lang) or questionnaire.SYMPTOMS[k]["label"]["en"]) for k in detected)
-            _save_session(connection, pid, {"stage": "confirm", "lang": lang, "text": text, "keys": detected, "message_ids": [in_id]})
-            _bot(connection, pid, t("confirm", lang, symptoms=labels))
-            return result | {"action": "confirm", "symptoms": detected}
+        # A voice note we could not transcribe: keep it for the clinician.
+        if audio and not text:
+            report = _submit(connection, db, pid, {"text": "", "lang": lang, "message_ids": [in_id], "voice": True}, upload_dir, audio=audio)
+            _save_session(connection, pid, None)
+            say(t("voice", lang), buttons=menu_buttons(lang))
+            if not patient["wa_opt_in"]:
+                say(t("not_opted", lang))
+            return result | {"action": "voice_report", "report_id": report["id"] if report else None}
 
-        state["message_ids"] = (state.get("message_ids") or []) + [in_id]
-        if state["stage"] == "confirm":
-            if word in ("2", "no", "नहीं", "లేదు"):
-                report = _submit(connection, db, pid, {**state, "keys": None}, upload_dir)
-                _bot(connection, pid, t("ack", lang))
-                return result | {"action": "report", "report_id": report["id"] if report else None}
-            if word not in ("1", "yes", "ok", "हाँ", "हां", "అవును"):
-                # More description: add it and re-detect.
-                state["text"] = (state["text"] + "\n" + text).strip()
-                state["keys"] = list(dict.fromkeys(state["keys"] + portal.detect_symptoms(text)["symptoms"]))
-                flags = portal.detect_red_flags(text, [], None, None)
-                if flags:
-                    _emergency_once(connection, pid, state, lang)
-                labels = ", ".join((questionnaire.SYMPTOMS[k]["label"].get(lang) or questionnaire.SYMPTOMS[k]["label"]["en"]) for k in state["keys"])
-                _save_session(connection, pid, state)
-                _bot(connection, pid, t("confirm", lang, symptoms=labels))
-                return result | {"action": "confirm", "symptoms": state["keys"]}
-            state.update({"stage": "questions", "queue": _queue(state["keys"]), "answers": {}, "safety": {}, "retries": 0, "asked_safety": False})
-        else:
+        flags = portal.detect_red_flags(text, [], None, None)
+        stage = (state or {}).get("stage")
+
+        if stage == "questions":
+            state["message_ids"] = (state.get("message_ids") or []) + [in_id]
+            state["voice"] = state.get("voice") or voice
+            if flags:
+                _emergency_once(connection, pid, state, lang, voice)
             key, qid = state["queue"][0]
             understood, value = _interpret(key, qid, text, lang)
             if not understood:
                 state["retries"] = state.get("retries", 0) + 1
                 if state["retries"] < 2:
                     _save_session(connection, pid, state)
-                    _bot(connection, pid, t("reply_number", lang) + "\n\n" + _question_text(key, qid, lang, False))
+                    say(t("reply_number", lang) + "\n\n" + _question_text(key, qid, lang, False))
                     return result | {"action": "retry"}
                 value = None  # give up on this question
             state["retries"] = 0
@@ -826,29 +979,130 @@ def receive(db: str, wa_from: str, text: str | None = None, audio: tuple[bytes, 
                     state["answers"].setdefault(key, {})[qid] = value
                 q = voice_answers.find_question(key, qid)
                 if key == "safety" and q.get("flag") and value == q["flag"][0]:
-                    _emergency_once(connection, pid, state, lang)
+                    _emergency_once(connection, pid, state, lang, voice)
                 elif key != "safety":
                     _, _, item_flags = questionnaire._grade(key, state["answers"][key])
                     if item_flags and key not in ("fever", "breathless", "bleeding"):
-                        _emergency_once(connection, pid, state, lang)
+                        _emergency_once(connection, pid, state, lang, voice)
             state["queue"].pop(0)
-        if state["queue"]:
-            key, qid = state["queue"][0]
-            first_safety = key == "safety" and not state.get("asked_safety")
-            if first_safety:
-                state["asked_safety"] = True
+            if state["queue"]:
+                key, qid = state["queue"][0]
+                first_safety = key == "safety" and not state.get("asked_safety")
+                if first_safety:
+                    state["asked_safety"] = True
+                _save_session(connection, pid, state)
+                say(_question_text(key, qid, lang, first_safety))
+                return result | {"action": "question", "question": [key, qid]}
+            try:
+                report = _submit(connection, db, pid, state, upload_dir)
+            except portal.PortalError:
+                report = _submit(connection, db, pid, {**state, "keys": None}, upload_dir)
+            if report and report.get("red_flags"):
+                _emergency_once(connection, pid, state, lang, voice)
+            say(t("done", lang), buttons=menu_buttons(lang))
+            return result | {"action": "checkin_submitted", "report_id": report["id"] if report else None}
+
+        if stage == "confirm":
+            state["message_ids"] = (state.get("message_ids") or []) + [in_id]
+            if word in ("2", "no", "नहीं", "లేదు"):
+                report = _submit(connection, db, pid, {**state, "keys": None}, upload_dir)
+                say(t("ack", lang), buttons=menu_buttons(lang))
+                return result | {"action": "report", "report_id": report["id"] if report else None}
+            if word in ("1", "yes", "ok", "हाँ", "हां", "అవును"):
+                return result | _start_questions(connection, pid, state, lang, voice)
+            state["text"] = (state.get("text", "") + "\n" + text).strip()
+            state["keys"] = list(dict.fromkeys(state["keys"] + portal.detect_symptoms(text)["symptoms"]))
+            if flags:
+                _emergency_once(connection, pid, state, lang, voice)
             _save_session(connection, pid, state)
-            _bot(connection, pid, _question_text(key, qid, lang, first_safety))
-            return result | {"action": "question", "question": [key, qid]}
-        try:
-            report = _submit(connection, db, pid, state, upload_dir)
-        except portal.PortalError:
-            report = _submit(connection, db, pid, {**state, "keys": None}, upload_dir)
-        flagged = bool(report and report.get("red_flags"))
-        if flagged:
-            _emergency_once(connection, pid, state, lang)
-        _bot(connection, pid, t("done", lang))
-        return result | {"action": "checkin_submitted", "report_id": report["id"] if report else None}
+            say(t("confirm", lang, symptoms=_labels(state["keys"], lang)))
+            return result | {"action": "confirm", "symptoms": state["keys"]}
+
+        if stage == "complaint":
+            report = _submit(connection, db, pid, {"text": text, "lang": lang, "message_ids": (state.get("message_ids") or []) + [in_id], "voice": voice},
+                             upload_dir, audio=audio)
+            if flags:
+                say(t("emergency", lang))
+            say(t("ack", lang), buttons=menu_buttons(lang))
+            if not patient["wa_opt_in"]:
+                say(t("not_opted", lang))
+            return result | {"action": "report", "report_id": report["id"] if report else None, "red_flags": [f["code"] for f in flags]}
+
+        if stage == "describe":
+            _save_session(connection, pid, None)
+            detected = portal.detect_symptoms(text)["symptoms"]
+            if flags or not detected:
+                report = _submit(connection, db, pid, {"text": text, "lang": lang, "message_ids": [in_id], "voice": voice}, upload_dir, audio=audio)
+                if flags:
+                    say(t("emergency", lang))
+                say(t("ack", lang), buttons=menu_buttons(lang))
+                return result | {"action": "report", "report_id": report["id"] if report else None, "red_flags": [f["code"] for f in flags]}
+            state = {"stage": "questions", "lang": lang, "text": text, "keys": detected, "message_ids": [in_id], "voice": voice}
+            say(t("will_ask", lang, symptoms=_labels(detected, lang)))
+            return result | {"symptoms": detected} | _start_questions(connection, pid, state, lang, voice)
+
+        # No conversation in progress. Safety first: red flags always get the fixed emergency text.
+        _save_session(connection, pid, None)
+        if flags:
+            report = _submit(connection, db, pid, {"text": text, "lang": lang, "message_ids": [in_id], "voice": voice}, upload_dir, audio=audio)
+            say(t("emergency", lang))
+            say(t("ack", lang))
+            if not patient["wa_opt_in"]:
+                say(t("not_opted", lang))
+            return result | {"action": "report", "report_id": report["id"] if report else None, "red_flags": [f["code"] for f in flags]}
+
+        decision = None
+        if agent.available():
+            try:
+                facts = record_facts(connection, patient)
+                decision = agent.decide(facts, _history(connection, pid)[:-1], text, lang, clinic())
+                decision["reply"], decision["guard"] = agent.guard(decision["reply"], facts, lang)
+            except Exception as error:  # fall back to the rule-based router
+                result["agent_error"] = str(error)[:160]
+                decision = None
+        if decision:
+            meta = {"agent": True, "intent": decision["intent"], "guard": decision["guard"], "model": decision["model"], "note": decision["note_for_doctor"]}
+            in_meta = json.loads(row_or_none(connection, "SELECT meta_json FROM whatsapp_messages WHERE id = ?", (in_id,))["meta_json"] or "{}")
+            in_meta.update({"intent": decision["intent"], "note": decision["note_for_doctor"]})
+            connection.execute("UPDATE whatsapp_messages SET meta_json = ? WHERE id = ?", (json.dumps(in_meta, ensure_ascii=False), in_id))
+            intent = decision["intent"]
+            if intent == "checkin":
+                say(decision["reply"], "agent", m=meta)
+                if decision["symptoms"]:
+                    state = {"stage": "questions", "lang": lang, "text": text, "keys": decision["symptoms"], "message_ids": [in_id], "voice": voice}
+                    return result | {"agent": meta, "symptoms": decision["symptoms"]} | _start_questions(connection, pid, state, lang, voice)
+                _save_session(connection, pid, {"stage": "describe", "lang": lang, "text": "", "message_ids": [in_id]})
+                say(t("describe", lang))
+                return result | {"agent": meta, "action": "check_start"}
+            if intent in ("complaint", "appointment"):
+                prefix = "Appointment request: " if intent == "appointment" else ""
+                report = _submit(connection, db, pid, {"text": text, "lang": lang, "message_ids": [in_id], "voice": voice}, upload_dir, audio=audio, prefix=prefix)
+                say(decision["reply"], "agent", buttons=menu_buttons(lang), m=meta)
+                if not patient["wa_opt_in"]:
+                    say(t("not_opted", lang))
+                return result | {"agent": meta, "action": "report", "report_id": report["id"] if report else None}
+            if intent == "question":
+                say(decision["reply"], "agent", m=meta)
+                return result | {"agent": meta, "action": "answered"}
+            _save_session(connection, pid, {"stage": "menu", "lang": lang})
+            say(decision["reply"], "agent", buttons=menu_buttons(lang), m=meta)
+            return result | {"agent": meta, "action": "menu"}
+
+        # Rule-based router (AI off or unavailable).
+        if word in GREETING_WORDS:
+            _save_session(connection, pid, {"stage": "menu", "lang": lang})
+            say(t("menu", lang), buttons=menu_buttons(lang))
+            return result | {"action": "menu"}
+        detected = portal.detect_symptoms(text)["symptoms"] if text else []
+        if not detected:
+            report = _submit(connection, db, pid, {"text": text, "lang": lang, "message_ids": [in_id], "voice": voice}, upload_dir, audio=audio)
+            say(t("ack", lang), buttons=menu_buttons(lang))
+            if not patient["wa_opt_in"]:
+                say(t("not_opted", lang))
+            return result | {"action": "report", "report_id": report["id"] if report else None, "red_flags": []}
+        _save_session(connection, pid, {"stage": "confirm", "lang": lang, "text": text, "keys": detected, "message_ids": [in_id], "voice": voice})
+        say(t("confirm", lang, symptoms=_labels(detected, lang)))
+        return result | {"action": "confirm", "symptoms": detected}
 
 
 def simulate_inbound(db: str, payload: dict[str, Any], upload_dir: Path) -> dict[str, Any]:
@@ -866,10 +1120,30 @@ def simulate_inbound(db: str, payload: dict[str, Any], upload_dir: Path) -> dict
         except ValueError:
             raise ApiError(422, "The recording could not be read") from None
     text = str(payload.get("text") or "")
-    if not text.strip() and not audio:
+    button_id = payload.get("button_id") or None
+    if not text.strip() and not audio and not button_id:
         raise ApiError(422, "Type a message or record a voice note")
-    result = receive(db, wa_from, text, audio, upload_dir, channel="simulator")
+    result = receive(db, wa_from, text, audio, upload_dir, channel="simulator", button_id=button_id,
+                     client_transcript=str(payload.get("client_transcript") or "") or None)
     return result | ({"thread": patient_thread(db, patient["id"])} if patient else {})
+
+
+# ---------------------------------------------------------------------------------------------- doctor actions -> WhatsApp
+def notify(db: str, patient_id: int, kind: str, actor: str, **payload: Any) -> dict[str, Any]:
+    """Send what the doctor just did in the app (plan, prescription, summary, reminder). The doctor's action is the approval.
+    Returns {kind, status, ...}; 'skipped' with a reason when the patient has not opted in or there is nothing to send."""
+    with transaction(db) as connection:
+        patient = row_or_none(connection, "SELECT phone, wa_opt_in FROM patients WHERE id = ?", (patient_id,))
+    if not patient or not patient["phone"]:
+        return {"kind": kind, "status": "skipped", "reason": "no mobile number"}
+    if not patient["wa_opt_in"]:
+        return {"kind": kind, "status": "skipped", "reason": "patient has not opted in to WhatsApp"}
+    try:
+        draft = compose(db, patient_id, {"kind": kind, **payload}, actor)
+        sent = approve_and_send(db, draft["id"], {}, actor)
+    except ApiError as error:
+        return {"kind": kind, "status": "skipped", "reason": error.message}
+    return {"kind": kind, "status": sent["status"], "message_id": sent["id"], "scheduled_for": sent.get("scheduled_for"), "error": sent.get("error")}
 
 
 # ---------------------------------------------------------------------------------------------- webhook (live)
@@ -906,14 +1180,15 @@ def handle_webhook(db: str, raw: bytes, signature: str | None, upload_dir: Path)
                                         json.dumps(st.get("errors"))[:300] if st.get("errors") else None, utc_now(), st.get("id")))
             for message in value.get("messages", []) or []:
                 kind = message.get("type")
-                text, audio = None, None
+                text, audio, button = None, None, None
                 if kind == "text":
                     text = (message.get("text") or {}).get("body")
                 elif kind == "button":
                     text = (message.get("button") or {}).get("text")
                 elif kind == "interactive":
                     inter = message.get("interactive") or {}
-                    text = (inter.get("button_reply") or inter.get("list_reply") or {}).get("title")
+                    choice = inter.get("button_reply") or inter.get("list_reply") or {}
+                    text, button = choice.get("title"), choice.get("id")
                 elif kind in ("audio", "voice"):
                     media = message.get(kind) or {}
                     try:
@@ -924,7 +1199,8 @@ def handle_webhook(db: str, raw: bytes, signature: str | None, upload_dir: Path)
                 else:
                     text = f"({kind} message received — open WhatsApp on the clinic phone to view)"
                 try:
-                    handled.append(receive(db, message.get("from", ""), text, audio, upload_dir, wa_message_id=message.get("id"), channel="live"))
+                    handled.append(receive(db, message.get("from", ""), text if not button else "", audio, upload_dir, wa_message_id=message.get("id"),
+                                           channel="live", button_id=button))
                 except Exception as error:  # never make Meta retry forever on our bug; log in the response
                     handled.append({"error": str(error)[:200]})
     return 200, {"received": len(handled)}

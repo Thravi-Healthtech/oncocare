@@ -171,6 +171,7 @@ def demo_banner_html() -> bytes:
 def make_handler(db_path: str | Path, static_dir: str | Path | None = None, require_auth: bool = True) -> type[BaseHTTPRequestHandler]:
     database_path = str(db_path)
     upload_dir = Path(database_path).resolve().parent / "uploads" if database_path != ":memory:" else Path("uploads")
+    whatsapp.MEDIA_DIR = upload_dir / "whatsapp"
     web_root = Path(static_dir).resolve() if static_dir else None
 
     class Handler(BaseHTTPRequestHandler):
@@ -494,6 +495,12 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                     self._insert_cycle(connection, plan_id, number, planned_date, meds, now)
                 plan = row_or_none(connection, "SELECT * FROM treatment_plans WHERE id = ?", (plan_id,))
                 plan["medications"] = rows(connection, "SELECT * FROM plan_medications WHERE treatment_plan_id = ? ORDER BY sort_order", (plan_id,))
+            if payload.get("notify_whatsapp"):
+                plan["whatsapp"] = [whatsapp.notify(database_path, patient_id, "plan", self._clinician_name())]
+                first = validated_cycles[0] if validated_cycles else None
+                if first and first[1] > date.today().isoformat():
+                    plan["whatsapp"].append(whatsapp.notify(database_path, patient_id, "reminder", self._clinician_name(), visit_date=first[1],
+                                                            visit_time="09:00", purpose=f"{clean_text(payload['regimen_name'])}, cycle {first[0]}"))
             return {"data": plan}
 
         def _insert_cycle(self, connection: sqlite3.Connection, plan_id: int, number: int, planned_date: str,
@@ -743,6 +750,17 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                     (cycle_id, outcome, category, rationale, decision_evidence(analysis, cycle_id), recorded_by, now))
                 updated = self._cycle_with_meds(connection, cycle_id)
                 updated["decisions"] = self._decisions(connection, cycle_id)
+                next_cycle = row_or_none(connection, """SELECT cycle_number, planned_date FROM treatment_cycles WHERE treatment_plan_id = ?
+                                                        AND status IN ('planned', 'delayed') ORDER BY planned_date LIMIT 1""", (cycle["treatment_plan_id"],))
+            if payload.get("notify_whatsapp"):
+                # The doctor's decision reaches the patient: a new date updates the plan; after a given cycle, a reminder for the next one.
+                sent = []
+                if outcome in ("delayed", "held", "discontinued"):
+                    sent.append(whatsapp.notify(database_path, plan["patient_id"], "plan", self._clinician_name()))
+                if outcome in ("given", "modified", "delayed") and next_cycle and next_cycle["planned_date"] > date.today().isoformat():
+                    sent.append(whatsapp.notify(database_path, plan["patient_id"], "reminder", self._clinician_name(), visit_date=next_cycle["planned_date"],
+                                                visit_time="09:00", purpose=f"Chemotherapy cycle {next_cycle['cycle_number']}"))
+                updated["whatsapp"] = sent
             return {"data": updated, "meta": {"previous_version_preserved": True}}
 
         def _decisions(self, connection: sqlite3.Connection, cycle_id: int) -> list[dict[str, Any]]:

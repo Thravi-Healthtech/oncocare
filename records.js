@@ -281,11 +281,12 @@ function openFinalise() {
         <li class="${ds.content.follow_up?.date || ds.content.follow_up?.none ? "ok" : "bad"}">Follow-up ${ds.content.follow_up?.date ? fmtDate(ds.content.follow_up.date) : ds.content.follow_up?.none ? "not needed" : "missing"}</li>
         <li class="${unsupported ? "warn" : "ok"}">${unsupported ? `${unsupported} narrative sentence(s) without a source` : "Every narrative sentence cites a source"}</li>
         <li class="ok">${ds.content.medications.length} medicine(s)</li></ul>
-      <label class="confirm-check"><input type="checkbox" name="confirmed" /><span>I have reviewed every section against the record and take responsibility for this summary.</span></label>`,
+      <label class="confirm-check"><input type="checkbox" name="confirmed" /><span>I have reviewed every section against the record and take responsibility for this summary.</span></label>
+      ${waTick(S.patient, `Send on WhatsApp: the summary${ds.content.medications.length ? ", the prescription" : ""}${ds.content.follow_up?.date ? " and a follow-up reminder" : ""}`)}`,
     onSubmit: async f => {
       if (!f.confirmed.checked) throw new Error("Confirm that you reviewed the summary.");
-      S.ds = await post(`/api/discharge-summaries/${ds.id}/finalise`, { confirmed: true });
-      showToast("Summary finalised. It is now in the patient portal.");
+      S.ds = await post(`/api/discharge-summaries/${ds.id}/finalise`, { confirmed: true, notify_whatsapp: f.notify_whatsapp.checked });
+      showToast(`Summary finalised and in the patient portal.${waResultText(S.ds.whatsapp)}`);
       renderDischarge();
       await loadPatient(S.ds.patient_id);
     } });

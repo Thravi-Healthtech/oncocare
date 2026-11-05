@@ -372,3 +372,121 @@ class WhatsAppTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WhatsAppAgentTests(Base):
+    def setUp(self) -> None:
+        phone = "96" + str(abs(hash(self._testMethodName)) % 10**8).zfill(8)
+        self.pid = self.patient(f"AG-{self._testMethodName}", phone=phone)
+        self.call("POST", f"/api/patients/{self.pid}/whatsapp/consent", {"opt_in": True, "method": "in_clinic_written"})
+
+    def send(self, **payload) -> dict:
+        status, body = self.call("POST", "/api/whatsapp/simulate", {"patient_id": self.pid, **payload})
+        self.assertEqual(status, 201, body)
+        return body["data"]
+
+    def outs(self, data: dict) -> list[dict]:
+        return [m for m in data["thread"]["messages"] if m["direction"] == "out"]
+
+    def test_menu_complaint_and_schedule_buttons(self) -> None:
+        data = self.send(text="hi")
+        self.assertEqual(data["action"], "menu")
+        self.assertEqual([b["id"] for b in self.outs(data)[-1]["buttons"]], ["menu_complaint", "menu_checkin", "menu_schedule"])
+        data = self.send(button_id="menu_complaint")
+        self.assertEqual(data["action"], "complaint_prompt")
+        data = self.send(text="The dressing on my scar is soaked")
+        self.assertEqual(data["action"], "report")
+        _, reports = self.call("GET", f"/api/patients/{self.pid}/patient-reports")
+        self.assertEqual(reports["data"][0]["text"], "The dressing on my scar is soaked")
+        self.assertEqual(reports["data"][0]["source"], "whatsapp")
+        data = self.send(text="3")  # menu shown again after the acknowledgement? numbered reply only maps while the menu is open
+        data = self.send(button_id="menu_schedule")
+        self.assertEqual(data["action"], "schedule")
+        self.assertIn("schedule", self.outs(data)[-1]["body"].lower())
+
+    def test_checkin_button_goes_straight_to_questions(self) -> None:
+        self.send(button_id="menu_checkin")
+        data = self.send(text="vomiting since yesterday")
+        self.assertEqual(data["action"], "question")
+        self.assertEqual(data["question"], ["vomiting", "onset"])
+
+    def test_voice_note_transcribed_and_answered_by_voice(self) -> None:
+        import base64
+        from unittest import mock
+        from backend import speech
+        with mock.patch.object(speech, "status", return_value={"enabled": True}), \
+             mock.patch.object(speech, "transcribe", return_value={"text": "నాకు జ్వరం వచ్చింది", "lang": "te", "language_code": "te-IN"}), \
+             mock.patch.object(speech, "synthesize", return_value=(b"ID3fake", "audio/mpeg")):
+            data = self.send(audio_base64=base64.b64encode(b"OggSfake").decode(), audio_type="audio/ogg")
+        self.assertEqual(data["transcript"], "నాకు జ్వరం వచ్చింది")
+        self.assertIn("fever", data["red_flags"])
+        out = self.outs(data)
+        self.assertTrue(any("112" in m["body"] for m in out))
+        self.assertTrue(all(m["meta"]["voice"] == "te" for m in out[-2:]))
+        self.assertTrue(out[-1]["has_audio"])
+        req = Request(self.base + f"/api/whatsapp/messages/{out[-1]['id']}/media")
+        with urlopen(req) as res:
+            self.assertEqual(res.read(), b"ID3fake")
+        _, reports = self.call("GET", f"/api/patients/{self.pid}/patient-reports")
+        self.assertTrue(reports["data"][0]["has_audio"])
+        self.assertEqual(reports["data"][0]["input_mode"], "voice")
+
+    def test_voice_note_with_browser_transcript_when_speech_is_off(self) -> None:
+        import base64
+        data = self.send(audio_base64=base64.b64encode(b"webmfake").decode(), audio_type="audio/webm", client_transcript="hard to swallow food")
+        self.assertEqual(data["action"], "confirm")
+        self.assertEqual(data["symptoms"], ["swallowing"])
+
+    def test_agent_reply_is_guarded(self) -> None:
+        from unittest import mock
+        from backend import agent
+        risky = {"intent": "question", "symptoms": [], "reply": "Take 1000 mg paracetamol now, it is normal.", "note_for_doctor": "asks about pain", "model": "test"}
+        with mock.patch.object(agent, "available", return_value=True), mock.patch.object(agent, "decide", return_value=dict(risky)):
+            data = self.send(text="can I take something for the pain?")
+        reply = self.outs(data)[-1]
+        self.assertEqual(reply["kind"], "agent")
+        self.assertEqual(reply["body"], agent.HANDOFF["en"])
+        self.assertTrue(reply["meta"]["guard"].startswith("blocked"))
+        complaint = {"intent": "complaint", "symptoms": [], "reply": "Thank you, I have shared this with your care team.", "note_for_doctor": "itchy skin", "model": "test"}
+        with mock.patch.object(agent, "available", return_value=True), mock.patch.object(agent, "decide", return_value=dict(complaint)):
+            data = self.send(text="my skin itches at night")
+        self.assertEqual(data["action"], "report")
+        self.assertEqual(self.outs(data)[-1]["body"], complaint["reply"])
+        checkin = {"intent": "checkin", "symptoms": ["skin_reaction"], "reply": "Sorry to hear that. A few questions follow.", "note_for_doctor": "", "model": "test"}
+        with mock.patch.object(agent, "available", return_value=True), mock.patch.object(agent, "decide", return_value=dict(checkin)):
+            data = self.send(text="the treated skin looks raw")
+        self.assertEqual(data["question"], ["skin_reaction", "onset"])
+
+    def test_guard_rules(self) -> None:
+        from backend import agent
+        facts = "Medicines prescribed: Paracetamol 650 mg three times a day"
+        self.assertEqual(agent.guard("Your prescription says Paracetamol 650 mg three times a day.", facts, "en")[1], "passed")
+        self.assertTrue(agent.guard("Take 500 mg ibuprofen.", facts, "en")[1].startswith("blocked"))
+        self.assertTrue(agent.guard("Don't worry, this is normal.", facts, "en")[1].startswith("blocked"))
+        self.assertTrue(agent.guard("x" * 800, facts, "en")[1].startswith("blocked"))
+
+    def test_doctor_actions_reach_whatsapp(self) -> None:
+        # Radiotherapy approval sends the plan.
+        cid = self.course(self.pid)["course"]["id"]
+        status, body = self.call("POST", f"/api/rt-courses/{cid}/approve", {"physicist": "S. Iyer", "notify_whatsapp": True})
+        self.assertEqual(body["data"]["whatsapp"][0]["status"], "sent")
+        # A chemotherapy plan sends the plan and a reminder for cycle 1.
+        start = (date.today() + timedelta(days=5)).isoformat()
+        status, body = self.call("POST", f"/api/patients/{self.pid}/treatment-plans", {
+            "regimen_name": "Weekly cisplatin", "notify_whatsapp": True, "medications": [{"drug_name": "Cisplatin", "dose": 40, "dose_unit": "mg/m2"}],
+            "cycles": [{"cycle_number": 1, "planned_date": start, "medications": [{"drug_name": "Cisplatin", "planned_dose": 40, "dose_unit": "mg/m2"}]}]})
+        self.assertEqual(status, 201, body)
+        self.assertEqual([w["status"] for w in body["data"]["whatsapp"]], ["sent", "scheduled"])
+        # Finalising a discharge summary sends summary + prescription and schedules the follow-up reminder.
+        _, ds = self.call("POST", f"/api/patients/{self.pid}/discharge-summaries", {})
+        sid = ds["data"]["id"]
+        self.call("PATCH", f"/api/discharge-summaries/{sid}", {"condition_at_discharge": "Stable", "medications": [{"name": "Ondansetron", "dose": "4 mg"}],
+                                                              "follow_up": {"date": (date.today() + timedelta(days=10)).isoformat()}})
+        status, body = self.call("POST", f"/api/discharge-summaries/{sid}/finalise", {"confirmed": True, "notify_whatsapp": True})
+        self.assertEqual(status, 200, body)
+        self.assertEqual([(w["kind"], w["status"]) for w in body["data"]["whatsapp"]],
+                         [("discharge", "sent"), ("prescription", "sent"), ("reminder", "scheduled")])
+        # Not opted in: skipped with a reason, nothing sent.
+        self.call("POST", f"/api/patients/{self.pid}/whatsapp/consent", {"opt_in": False})
+        status, body = self.call("PATCH", f"/api/rt-courses/{cid}", {"status": "on_hold", "status_reason": "Skin", "notify_whatsapp": True})
+        self.assertEqual(body["data"]["whatsapp"][0]["status"], "skipped")

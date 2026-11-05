@@ -142,6 +142,24 @@ function confirmDialog(title, body, action, okLabel = "Delete") {
   S.confirmAction = action;
   openModal("confirmModal");
 }
+/* WhatsApp: what the doctor does in the app is sent to the patient when the box is ticked. */
+const WA_KIND_SHORT = { plan: "treatment plan", prescription: "prescription", discharge: "summary", reminder: "reminder", message: "message" };
+function waResultText(list) {
+  if (!list?.length) return "";
+  const done = list.filter(w => ["sent", "scheduled"].includes(w.status));
+  const skipped = list.filter(w => !["sent", "scheduled"].includes(w.status));
+  const parts = done.map(w => w.status === "scheduled" ? `${WA_KIND_SHORT[w.kind]} scheduled ${fmtShort(w.scheduled_for?.slice(0, 10))}` : `${WA_KIND_SHORT[w.kind]} sent`);
+  const why = skipped.length ? `not sent (${[...new Set(skipped.map(w => w.reason || w.error || w.status))].join("; ")})` : "";
+  return ` WhatsApp: ${[parts.join(", "), why].filter(Boolean).join(" · ")}.`;
+}
+function waTick(patient, label) {
+  const ok = patient?.wa_opt_in && patient?.phone;
+  return `<label class="confirm-check wa-tick"><input type="checkbox" name="notify_whatsapp" ${ok ? "checked" : ""} ${patient?.phone ? "" : "disabled"} /><span>${esc(label)}${ok ? "" : patient?.phone ? " — patient has not opted in yet; it will be skipped" : " — no mobile number"}</span></label>`;
+}
+function setWaTick(form, label) {
+  const holder = $(".wa-tick-holder", form);
+  if (holder) holder.innerHTML = waTick(S.patient, label);
+}
 function cyclesOf() { return S.L?.cycles || []; }
 function cycleById(id) { return cyclesOf().find(c => c.id === Number(id)); }
 function regimenDrugs() { return (S.L?.medications || []).map(m => m.drug_name); }
@@ -546,6 +564,7 @@ async function submitPlan(event) {
   };
   renderPlanPreview();
   closeModals();
+  setWaTick($("#planPreviewForm"), "Send the plan and a reminder for cycle 1 to the patient on WhatsApp");
   openModal("planPreviewModal");
 }
 function renderPlanPreview() {
@@ -573,13 +592,14 @@ async function submitPlanPreview(event) {
   await withBusy(form, async () => {
     const plan = await post(`/api/patients/${S.patient.id}/treatment-plans`, {
       ...d.header,
+      notify_whatsapp: form.elements.notify_whatsapp.checked,
       medications: d.meds.map(m => ({ drug_name: m.drug_name, dose: Number(m.planned_dose), dose_unit: m.dose_unit, route: m.route || null })),
       cycles: d.cycles.map(c => ({ cycle_number: c.cycle_number, planned_date: c.planned_date,
         medications: c.meds.map(m => ({ drug_name: String(m.drug_name).trim(), planned_dose: Number(m.planned_dose), dose_unit: String(m.dose_unit).trim(), route: (m.route || "").trim() || null })) })),
     });
     closeModals();
     S.planDraft = null;
-    showToast(`Plan saved with ${d.cycles.length} cycles.${unordered ? " Note: cycle dates are not in order." : ""}`);
+    showToast(`Plan saved with ${d.cycles.length} cycles.${unordered ? " Note: cycle dates are not in order." : ""}${waResultText(plan.whatsapp)}`);
     navigate(`#plan/${plan.id}/cycles`);
   });
 }
@@ -733,6 +753,7 @@ function openRecordForm(cycleId) {
   const form = $("#recordForm");
   form.reset();
   formError(form, "");
+  setWaTick(form, "Tell the patient on WhatsApp (new date, or a reminder for the next cycle)");
   $("#recordModalTitle").textContent = `Record cycle ${cycle.cycle_number}`;
   $("#recordModalSub").textContent = `Planned ${fmtDate(cycle.planned_date)} · ${S.L.plan.regimen_name}`;
   form.elements.administered_date.value = cycle.administered_date || (cycle.planned_date <= todayISO() ? cycle.planned_date : todayISO());
@@ -803,11 +824,12 @@ async function submitRecord(event) {
     body.new_planned_date = v.new_planned_date;
     body.shift_following = form.elements.shift_following.checked;
   }
+  body.notify_whatsapp = form.elements.notify_whatsapp.checked;
   await withBusy(form, async () => {
-    await post(`/api/cycles/${S.recordingCycleId}/record`, body);
+    const saved = await post(`/api/cycles/${S.recordingCycleId}/record`, body);
     closeModals();
     await refreshPlan();
-    showToast(`Cycle recorded: ${OUTCOME_LABEL[outcome]}. Evidence snapshot saved with the decision.`);
+    showToast(`Cycle recorded: ${OUTCOME_LABEL[outcome]}.${waResultText(saved.whatsapp)}`);
   });
 }
 

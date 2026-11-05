@@ -46,9 +46,9 @@ def _routes(ctx: Ctx) -> list[tuple[str, dict[str, Callable[..., Any]]]]:
             "POST": lambda pid: _ok(rt.create_course(db, pid, ctx.body(), actor), 201)}),
         (r"/api/rt-courses/(\d+)", {
             "GET": lambda cid: _ok(rt.workspace(db, cid)),
-            "PATCH": lambda cid: _ok(rt.update_course(db, cid, ctx.body(), actor)),
+            "PATCH": lambda cid: _ok(_rt_notify(ctx, rt.update_course, cid)),
             "DELETE": lambda cid: _ok(rt.delete_course(db, cid))}),
-        (r"/api/rt-courses/(\d+)/approve", {"POST": lambda cid: _ok(rt.approve(db, cid, ctx.body(), actor))}),
+        (r"/api/rt-courses/(\d+)/approve", {"POST": lambda cid: _ok(_rt_notify(ctx, rt.approve, cid))}),
         (r"/api/rt-courses/(\d+)/fractions", {"POST": lambda cid: _ok(rt.add_fraction(db, cid, ctx.body(), actor), 201)}),
         (r"/api/rt-fractions/(\d+)", {"DELETE": lambda fid: _ok(rt.delete_fraction(db, fid, actor))}),
         (r"/api/rt-courses/(\d+)/breaks", {"POST": lambda cid: _ok(rt.record_break(db, cid, ctx.body(), actor), 201)}),
@@ -85,7 +85,7 @@ def _routes(ctx: Ctx) -> list[tuple[str, dict[str, Callable[..., Any]]]]:
             "PATCH": lambda sid: _ok(discharge.update_draft(db, sid, ctx.body(), actor)),
             "DELETE": lambda sid: _ok(discharge.delete_draft(db, sid))}),
         (r"/api/discharge-summaries/(\d+)/regenerate", {"POST": lambda sid: _ok(discharge.regenerate(db, sid, ctx.body(), actor))}),
-        (r"/api/discharge-summaries/(\d+)/finalise", {"POST": lambda sid: _ok(discharge.finalise(db, sid, ctx.body(), actor))}),
+        (r"/api/discharge-summaries/(\d+)/finalise", {"POST": lambda sid: _ok(_finalise_notify(ctx, sid))}),
         (r"/api/discharge-summaries/(\d+)/revise", {"POST": lambda sid: _ok(discharge.revise(db, sid, actor), 201)}),
         (r"/api/discharge-summaries/(\d+)/print", {"GET": lambda sid: RawResponse(discharge.print_html(db, sid).encode(), "text/html; charset=utf-8")}),
         # WhatsApp
@@ -102,6 +102,36 @@ def _routes(ctx: Ctx) -> list[tuple[str, dict[str, Callable[..., Any]]]]:
         (r"/api/whatsapp/simulate", {"POST": lambda: _ok(whatsapp.simulate_inbound(db, ctx.body(15_000_000), ctx.upload_dir), 201)}),
         (r"/api/whatsapp/templates", {"GET": lambda: _ok(whatsapp.template_definitions())}),
     ]
+
+
+def _rt_notify(ctx: Ctx, fn: Callable[..., dict[str, Any]], course_id: int) -> dict[str, Any]:
+    """Approve / pause / resume a course; with notify_whatsapp the updated plan goes to the patient."""
+    from . import whatsapp
+    body = ctx.body()
+    before = rt.workspace(ctx.db, course_id)["course"]["status"] if "status" in body else None
+    data = fn(ctx.db, course_id, body, ctx.actor)
+    changed = before is None or data["course"]["status"] != before
+    if body.get("notify_whatsapp") and changed:
+        data["whatsapp"] = [whatsapp.notify(ctx.db, data["patient"]["id"], "plan", ctx.actor)]
+    return data
+
+
+def _finalise_notify(ctx: Ctx, summary_id: int) -> dict[str, Any]:
+    """Finalising sends the summary, the prescription and a follow-up reminder when notify_whatsapp is set."""
+    from . import discharge, whatsapp
+    body = ctx.body()
+    data = discharge.finalise(ctx.db, summary_id, body, ctx.actor)
+    if body.get("notify_whatsapp"):
+        pid, content = data["patient_id"], data["content"]
+        sent = [whatsapp.notify(ctx.db, pid, "discharge", ctx.actor, summary_id=summary_id)]
+        if content.get("medications"):
+            sent.append(whatsapp.notify(ctx.db, pid, "prescription", ctx.actor, summary_id=summary_id))
+        fu = content.get("follow_up") or {}
+        if fu.get("date"):
+            sent.append(whatsapp.notify(ctx.db, pid, "reminder", ctx.actor, visit_date=fu["date"], visit_time="10:00",
+                                        purpose=f"Follow-up{' with ' + fu['with'] if fu.get('with') else ''}"))
+        data["whatsapp"] = sent
+    return data
 
 
 def _with(db: str, fn: Callable[[Any], Any]) -> Any:

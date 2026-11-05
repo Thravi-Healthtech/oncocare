@@ -237,7 +237,7 @@
           <!-- WhatsApp -->
           <section class="view" data-view="whatsapp" aria-labelledby="waTitle">
             <div class="page-heading compact">
-              <div><p class="eyebrow">Patient communication</p><h1 id="waTitle">WhatsApp</h1><p>Share plans, prescriptions, summaries and visit reminders after you approve them. Patients reply in the same chat; automatic replies are fixed texts and the symptom questions, never AI.</p></div>
+              <div><p class="eyebrow">Patient communication</p><h1 id="waTitle">WhatsApp</h1><p>Everything you send from the chart (plans, prescriptions, summaries, reminders) arrives here. Patients reply by text or voice: the agent registers complaints, runs the CTCAE check-in and answers schedule questions from the record. It never gives medical advice; red flags always get the fixed emergency message.</p></div>
               <span id="waModeBadge" class="chip"></span>
             </div>
             <div id="waContent"></div>
@@ -302,6 +302,7 @@
         <div class="modal-heading"><div><p class="eyebrow">Step 2 of 2 · Review each cycle</p><h2 id="planPreviewTitle">Review cycles before saving</h2><p id="planPreviewSummary" class="muted"></p></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
         <form id="planPreviewForm" novalidate>
           <div id="planPreviewCycles" class="preview-cycles"></div>
+          <div class="wa-tick-holder"></div>
           <p class="form-error" role="alert" hidden></p>
           <div class="modal-actions"><button class="button secondary" type="button" data-action="plan-back">← Back</button><button class="button primary" type="submit">Save plan and cycles</button></div>
         </form>
@@ -354,6 +355,7 @@
             <label class="field"><span>Recorded by</span><input name="recorded_by" value="" maxlength="80" /></label>
             <label class="field span-2"><span>Clinical rationale</span><textarea name="rationale" rows="3" maxlength="2000" placeholder="Why was the cycle modified, delayed, held or stopped?"></textarea></label>
           </div>
+          <div class="wa-tick-holder"></div>
           <p class="form-error" role="alert" hidden></p>
           <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit">Save and sign</button></div>
         </form>

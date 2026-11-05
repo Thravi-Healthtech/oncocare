@@ -46,17 +46,25 @@ function tick(m) {
   return { draft: '<span class="tick">draft</span>', scheduled: `<span class="tick">🕑 ${fmtDateTime(m.scheduled_for)}</span>`, sent: '<span class="tick">✓</span>', delivered: '<span class="tick">✓✓</span>',
     read: '<span class="tick read">✓✓</span>', failed: `<span class="tick fail" title="${esc(m.error || "")}">✗ failed</span>`, cancelled: '<span class="tick">cancelled</span>' }[m.status] || "";
 }
+const VOICE_LANG = { en: "en-IN", hi: "hi-IN", te: "te-IN" };
 function bubble(m) {
   const out = m.direction === "out";
-  const label = out ? (m.kind === "bot" ? "Automatic reply" : `${WA_KIND[m.kind] || m.kind}${m.approved_by ? ` · approved by ${m.approved_by}` : ""}`) : (m.kind === "voice" ? "Voice note" : "");
+  const meta = m.meta || {};
+  let label = "";
+  if (out) label = m.kind === "agent" ? `AI agent · ${meta.intent || ""}${meta.guard && meta.guard !== "passed" ? " · replaced by fixed text (guard)" : ""}`
+    : m.kind === "bot" ? "Automatic reply" : `${WA_KIND[m.kind] || m.kind}${m.approved_by ? ` · approved by ${m.approved_by}` : ""}`;
+  else if (m.kind === "voice") label = `Voice note${meta.transcribed && meta.transcribed !== "none" ? ` · transcribed (${meta.transcribed === "sarvam" ? "Sarvam AI" : "browser"})` : " · not transcribed"}`;
+  else if (meta.intent) label = `Agent read: ${meta.intent}`;
   const body = esc(m.body).replace(/\*(.+?)\*/g, "<b>$1</b>").replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
-  return `<div class="wa-msg ${out ? "out" : "in"} ${m.kind === "bot" ? "bot" : ""} ${["scheduled", "cancelled", "failed"].includes(m.status) ? m.status : ""}">
-    ${label ? `<small class="wa-label">${esc(label)}</small>` : ""}
-    <div class="wa-text">${body}</div>
-    ${m.has_audio && m.report_id ? `<audio controls preload="none" src="/api/patient-reports/${m.report_id}/audio"></audio>` : ""}
+  const audio = m.has_audio ? `<audio controls preload="none" src="/api/whatsapp/messages/${m.id}/media"></audio>` : "";
+  const listen = out && meta.voice && !m.has_audio ? `<button type="button" class="wa-listen" data-wa="listen" data-message="${m.id}" data-lang="${esc(meta.voice)}">▶ Listen</button>` : "";
+  const buttons = m.buttons?.length ? `<div class="wa-buttons">${m.buttons.map(b => `<button type="button" data-wa="button" data-id="${esc(b.id)}">${esc(b.title)}</button>`).join("")}</div>` : "";
+  return `<div class="wa-msg ${out ? "out" : "in"} ${m.kind === "bot" || m.kind === "agent" ? "bot" : ""} ${m.kind === "agent" ? "agent" : ""} ${["scheduled", "cancelled", "failed"].includes(m.status) ? m.status : ""}" data-msg="${m.id}">
+    ${label ? `<small class="wa-label" ${meta.note ? `title="${esc(meta.note)}"` : ""}>${esc(label)}</small>` : ""}
+    ${audio}<div class="wa-text">${body}</div>${listen}
     <div class="wa-meta">${m.report_id && !out ? `<a href="#inbox" class="wa-link">in inbox</a>` : ""}<span>${new Date(m.sent_at || m.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>${tick(m)}</div>
     ${m.status === "scheduled" ? `<button class="text-button small" data-wa="cancel" data-message="${m.id}">Cancel</button>` : ""}
-  </div>`;
+  </div>${buttons}`;
 }
 function renderWa() {
   const st = S.wa?.status || {};
@@ -89,7 +97,7 @@ function renderWa() {
       <header class="wa-head"><span class="avatar">${esc(initials(p))}</span><div><strong>${esc(p.first_name)} ${esc(p.last_name)}</strong><small>+${esc(p.wa_number || "")} · ${esc(st.clinic || "")}</small></div>
         <span class="wa-window ${t.window_open ? "open" : ""}" title="WhatsApp allows free-form messages for 24 hours after the patient's last message; otherwise only approved templates">${t.window_open ? "24-h window open" : "Templates only"}</span></header>
       <div class="wa-body" id="waBody">${chat || '<div class="wa-empty">No messages yet. Share the treatment plan, or type as the patient below to try the symptom flow.</div>'}</div>
-      ${st.mode === "simulator" ? `<form class="wa-compose" id="waSimForm"><div class="wa-quick">${["1", "2", "CHECK", "HELP", "STOP"].map(q => `<button type="button" class="chip" data-wa="quick" data-text="${q}">${q}</button>`).join("")}<span class="muted small">Simulator: you are typing as the patient</span></div>
+      ${st.mode === "simulator" ? `<form class="wa-compose" id="waSimForm"><div class="wa-quick">${["Hi", "1", "2", "MENU", "STOP"].map(q => `<button type="button" class="chip" data-wa="quick" data-text="${q}">${q}</button>`).join("")}<span class="muted small">Simulator: you are typing as the patient</span></div>
         <div class="wa-input"><input name="text" placeholder="Message as ${esc(p.first_name)} — e.g. my skin is peeling where I get radiation" autocomplete="off" />
         <button type="button" class="wa-mic" data-wa="record" title="Record a voice note as the patient" aria-label="Record voice note">🎤</button><button class="wa-send" type="submit" aria-label="Send">➤</button></div></form>`
       : `<div class="wa-compose live-note">Patients message your WhatsApp Business number; their messages arrive here and in Patient messages.</div>`}
@@ -100,7 +108,11 @@ function renderWa() {
           : `<p class="muted">${p.wa_opt_in_method === "patient_stop" ? "The patient sent STOP." : "Not opted in."} Plans, prescriptions and reminders need the patient's consent.</p><button class="button primary small" data-wa="consent" data-patient="${p.id}">Record consent</button>`}
         <p class="muted small">Language: ${LANG_NAME[p.preferred_language] || "English"} (automatic replies and questions)</p>
       </article>
-      <article class="panel top-gap"><p class="eyebrow">Send to patient</p><p class="muted small">Composed from the record; you review and approve every message.</p>
+      <article class="panel top-gap"><p class="eyebrow">Agent</p>
+        <p class="small"><strong>${esc(st.agent || "")}</strong><br><span class="muted">${st.agent?.startsWith("AI") ? "Understands text and voice in the patient's language, registers complaints, runs the CTCAE check-in and answers schedule and prescription questions from the record. Replies are checked before sending." : "AI is off: keywords route messages and every reply is a fixed text. Add an Anthropic key (AI settings) to turn on the agent."} Red flags always get the fixed emergency text.</span></p>
+        <p class="small"><strong>Voice:</strong> ${st.speech?.enabled ? "Sarvam AI (transcribes voice notes, speaks replies)" : `<span class="text-amber">off</span> — set SARVAM_API_KEY. The simulator uses the browser's speech meanwhile.`}</p>
+      </article>
+      <article class="panel top-gap"><p class="eyebrow">Send to patient</p><p class="muted small">Plans, prescriptions, summaries and reminders also go out automatically when you save them in the chart (tick "Send on WhatsApp"). Use these to send one now.</p>
         <div class="wa-actions">
           <button class="button secondary" data-wa-share="plan" data-patient="${p.id}">Treatment plan</button>
           <button class="button secondary" data-wa-share="reminder" data-patient="${p.id}">Visit reminder</button>
@@ -242,14 +254,28 @@ async function toggleRecording(button) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const chunks = [];
     const rec = new MediaRecorder(stream);
+    S.waHeard = "";
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR && !S.wa?.status?.speech?.enabled) {
+      try {
+        const sr = new SR();
+        sr.lang = VOICE_LANG[S.waThread?.patient?.preferred_language] || "en-IN";
+        sr.continuous = true; sr.interimResults = false;
+        sr.onresult = e => { S.waHeard = Array.from(e.results).map(r => r[0].transcript).join(" "); };
+        sr.start();
+        S.waSR = sr;
+      } catch { S.waSR = null; }
+    }
     rec.ondataavailable = e => e.data.size && chunks.push(e.data);
     rec.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
+      try { S.waSR?.stop(); } catch { /* ignore */ }
+      await new Promise(r => setTimeout(r, 400));
       S.waRecorder = null;
       button.classList.remove("recording");
       const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
       const data = await new Promise(resolve => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(",")[1]); r.readAsDataURL(blob); });
-      try { await simulate({ audio_base64: data, audio_type: blob.type }); } catch (e) { showToast(e.message); }
+      try { await simulate({ audio_base64: data, audio_type: blob.type, client_transcript: S.waHeard || null }); } catch (e) { showToast(e.message); }
     };
     rec.start();
     S.waRecorder = rec;
@@ -273,6 +299,15 @@ document.addEventListener("click", async event => {
     switch (el.dataset.wa) {
       case "consent": return openConsent(Number(el.dataset.patient));
       case "quick": return simulate({ text: el.dataset.text });
+      case "button": return simulate({ button_id: el.dataset.id });
+      case "listen": {
+        const m = S.waThread?.messages.find(x => x.id === Number(el.dataset.message));
+        if (!m || !window.speechSynthesis) return showToast("This browser cannot read the message aloud.");
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(m.body.replace(/\*/g, "").replace(/https?:\/\/\S+/g, ""));
+        u.lang = VOICE_LANG[el.dataset.lang] || "en-IN";
+        return speechSynthesis.speak(u);
+      }
       case "record": return toggleRecording(el);
       case "templates": return showTemplates();
       case "cancel": await del(`/api/whatsapp/messages/${el.dataset.message}`); showToast("Scheduled message cancelled."); return refreshThread();

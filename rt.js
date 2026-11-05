@@ -404,10 +404,12 @@ function openApprove() {
     body: `<div class="form-grid"><label class="field"><span>Physicist</span><input name="physicist" maxlength="80" required /></label>
       <label class="field"><span>Radiation oncologist</span><input name="oncologist" maxlength="80" value="${esc(clinicianName())}" /></label></div>
       ${R.constraints.some(c => c.met === "no") ? '<p class="check-alert">One or more dose constraints are marked as not met.</p>' : ""}
-      <label class="confirm-check"><input type="checkbox" name="confirmed" /><span>I reviewed the prescription, dose constraints and set-up data.</span></label>`,
+      <label class="confirm-check"><input type="checkbox" name="confirmed" /><span>I reviewed the prescription, dose constraints and set-up data.</span></label>
+      ${waTick(S.patient, "Send the radiotherapy plan to the patient on WhatsApp")}`,
     onSubmit: async f => {
       if (!f.confirmed.checked) throw new Error("Confirm that you reviewed the plan.");
-      await rtCall("POST", `/api/rt-courses/${R.course.id}/approve`, { physicist: f.physicist.value, oncologist: f.oncologist.value }, "Plan approved. Treatment can be recorded.");
+      const data = await rtCall("POST", `/api/rt-courses/${R.course.id}/approve`, { physicist: f.physicist.value, oncologist: f.oncologist.value, notify_whatsapp: f.notify_whatsapp.checked });
+      showToast(`Plan approved. Treatment can be recorded.${waResultText(data.whatsapp)}`);
     } });
 }
 function constraintRow(c = {}, i) {
@@ -449,9 +451,11 @@ function openPause() {
     body: `<fieldset class="outcome-options compact-options"><legend>Change</legend>
       <label><input type="radio" name="status" value="on_hold" checked /><span><strong>Pause treatment</strong><small>Fractions cannot be recorded until resumed</small></span></label>
       <label><input type="radio" name="status" value="discontinued" /><span><strong>Stop radiotherapy</strong><small>Closes the course; record the completion summary</small></span></label></fieldset>
-      <label class="field"><span>Reason</span><textarea name="reason" rows="2" maxlength="1000" required></textarea></label>`,
+      <label class="field"><span>Reason</span><textarea name="reason" rows="2" maxlength="1000" required></textarea></label>
+      ${waTick(S.patient, "Tell the patient on WhatsApp")}`,
     onSubmit: async f => {
-      await rtCall("PATCH", `/api/rt-courses/${R.course.id}`, { status: f.status.value, status_reason: f.reason.value }, f.status.value === "on_hold" ? "Treatment paused." : "Radiotherapy stopped.");
+      const data = await rtCall("PATCH", `/api/rt-courses/${R.course.id}`, { status: f.status.value, status_reason: f.reason.value, notify_whatsapp: f.notify_whatsapp.checked });
+      showToast(`${f.status.value === "on_hold" ? "Treatment paused." : "Radiotherapy stopped."}${waResultText(data.whatsapp)}`);
     } });
 }
 function openReopen() {
@@ -572,7 +576,10 @@ document.addEventListener("click", async event => {
       case "add-constraint": $("#constraintRows").insertAdjacentHTML("beforeend", constraintRow({}, $$(".rt-constraint-row").length)); return;
       case "phase-data": return openPhaseData(Number(el.dataset.phase));
       case "pause": return openPause();
-      case "resume": return rtCall("PATCH", `/api/rt-courses/${R.course.id}`, { status: "active" }, "Treatment resumed.");
+      case "resume": {
+        const data = await rtCall("PATCH", `/api/rt-courses/${R.course.id}`, { status: "active", notify_whatsapp: Boolean(S.patient?.wa_opt_in) });
+        return showToast(`Treatment resumed.${waResultText(data.whatsapp)}`);
+      }
       case "reopen": return openReopen();
       case "delete-course":
         return confirmDialog(`Delete ${R.course.site}?`, "The prescription, plan data, every recorded fraction and the weekly reviews will be removed. This cannot be undone.", async () => {

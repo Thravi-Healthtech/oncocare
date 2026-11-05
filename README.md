@@ -149,13 +149,24 @@ Patient record → **Open running summary** (or sidebar **Running summary**). It
 ### Discharge / end-of-treatment summary
 **Create discharge summary** → choose type and period → a **draft** is built from the record: treatment given (chemo and radiotherapy with phases, interruptions, completion), course during treatment (cited narrative), toxicities, complaints between visits and how they were handled, investigations and reports. The clinician edits the diagnosis and narrative and enters **condition at discharge, medicines, advice and follow-up** (never generated). **Review & finalise** checks required sections and locks the summary; changes need a **new version** (the previous one is marked superseded). **Print / PDF** opens a printable page (citations removed). Finalised summaries appear in the patient portal.
 
-### WhatsApp
-Sidebar **WhatsApp**. Default `WHATSAPP_MODE=simulator`: nothing leaves the server; the phone panel lets you type or record a voice note *as the patient*.
-- **Consent**: record in-clinic consent (or the patient sends START). STOP turns messages off and cancels scheduled reminders.
-- **Send to patient**: treatment plan (chemo + radiotherapy in plain language), prescription (medicines from a finalised summary), discharge summary (portal link + next visit), **visit reminder** (sent the day before at 10:00 IST unless another time is chosen; the server checks every minute) and free text. Every message is composed from the record, shown for editing and must be **approved** before it is sent or scheduled.
-- **Patient replies in the same chat**: free text or voice notes become patient messages in the inbox (marked *WhatsApp*). Red-flag words get the fixed emergency reply immediately. When symptoms are recognised the patient is offered the **same fixed check-in questions** as the portal (numbered replies, or words interpreted by the existing rules), in English, Hindi or Telugu; the answers produce suggested CTCAE grades for the clinician. New radiotherapy check-in symptoms: skin reaction, dry mouth, swallowing difficulty. Unfinished check-ins are submitted after 2 hours so nothing is lost. All automatic replies are fixed texts; AI never writes to the patient.
-- **Doctor's reply** from the inbox goes back on WhatsApp.
-- **Live mode**: set `WHATSAPP_MODE=live`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (see `.env.example`), point the Meta webhook to `https://<host>/api/whatsapp/webhook`, and get the five UTILITY templates approved (WhatsApp page → Going live → view). Outside 24 hours from the patient's last message only those templates are used.
+### WhatsApp agent
+Sidebar **WhatsApp**. Default `WHATSAPP_MODE=simulator`: nothing leaves the server; the phone panel lets you type, tap buttons or record a voice note *as the patient*.
+
+**What the doctor does in the chart reaches the patient.** Every action below has a *Send on WhatsApp* tickbox (ticked when the patient has opted in); the doctor's action is the approval:
+- saving a chemotherapy plan → the plan + a reminder for cycle 1;
+- recording a cycle → a new date (delay/hold/stop) updates the plan; after a given cycle, a reminder for the next one (day before, 10:00 IST);
+- approving, pausing or resuming radiotherapy → the updated plan;
+- finalising a discharge summary → the summary (portal link), the prescription and a follow-up reminder;
+- a reply to a patient message → sent back on WhatsApp.
+The WhatsApp page can also send any of these on demand (preview, edit, approve) and a free-text message.
+
+**Patients use the same chat** (text or voice, English/Hindi/Telugu):
+- A menu with three buttons: **Register complaint**, **Symptom check-in** (the fixed CTCAE-based questions with suggested grades for the doctor), **My schedule** (from the record). "Hi", MENU or HELP shows it; STOP/START manage consent.
+- **Agent** (when the Anthropic key is set): Claude reads each message, chooses an action (complaint, check-in for the symptoms it found, a schedule/prescription question answered only from the record, appointment request, greeting) and drafts a short reply in the patient's language. Guard rails in code: red-flag rules run first and send the fixed emergency text; replies with advice phrases ("don't worry", "stop taking", "it is normal"…), doses not in the record, unknown links or excessive length are replaced with a fixed hand-off text; every decision (intent, guard result, note for the doctor) is stored and shown in the chat. Without AI, keyword rules route messages and replies are fixed texts.
+- **Voice**: with `SARVAM_API_KEY`, voice notes are transcribed by Sarvam AI (language auto-detected) and handled like text; when the patient spoke, replies (including the check-in questions) also go out as spoken audio (Sarvam TTS, MP3). Without a key, voice notes are kept for the clinician; the simulator uses the browser's speech recognition and "Listen" instead.
+- Every complaint and check-in lands in **Patient messages** (marked WhatsApp) with AI triage, and the doctor's reply goes back on WhatsApp.
+
+**Live mode**: set `WHATSAPP_MODE=live`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (see `.env.example`), point the Meta webhook to `https://<host>/api/whatsapp/webhook`, and get the five UTILITY templates approved (WhatsApp page → Going live → view). Outside 24 hours from the patient's last message only those templates are used. Menu buttons are sent as WhatsApp reply buttons; spoken replies are uploaded as audio messages.
 
 Clinical dates use the clinic's time zone (`ONCOCARE_TZ`, default Asia/Kolkata), so "today" is correct for India when the server runs in UTC. The demo seed adds **Lakshmi Varma (HN-24102, mobile 9000000102)** on adjuvant breast radiotherapy (19 of 20 fractions, a public-holiday gap, week 4 G2 dermatitis) and a completed pelvic chemoradiation course for Ananya Mehta.
 
