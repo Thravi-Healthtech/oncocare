@@ -240,7 +240,7 @@ def add_event(db: str, case_id: int, payload: dict[str, Any], actor: str) -> dic
     if grade not in (None, *CLAVIEN_DINDO):
         raise ApiError(422, "Clavien–Dindo grade must be I, II, IIIa, IIIb, IVa, IVb or V")
     if kind in ("complication", "return_to_theatre", "readmission") and not grade:
-        raise ApiError(422, "Grade the complication with the Clavien–Dindo classification", {"fields": ["clavien_dindo"]})
+        raise ApiError(422, "Grade the complication with the Clavien–Dindo classification.")
     complication = _text(payload.get("complication"), 200)
     if kind == "complication" and not complication:
         raise ApiError(422, "Name the complication (e.g. seroma, wound infection)", {"fields": ["complication"]})
@@ -352,7 +352,7 @@ def build(connection: sqlite3.Connection, case_id: int, today: date | None = Non
     if case["status"] in ("planned", "scheduled") and pending:
         days_to = (date.fromisoformat(case["surgery_date"]) - today).days if case["surgery_date"] else None
         attention.append({"severity": "alert" if days_to is not None and days_to <= 2 else "warning",
-                          "text": f"Pre-op checklist: {len(pending)} item(s) open" + (f", surgery in {days_to} day(s)" if days_to is not None and days_to >= 0 else "")
+                          "text": f"Pre-op checklist: {len(pending)} item(s) open" + (("; surgery today" if days_to == 0 else f"; surgery in {days_to} day{'s' if days_to != 1 else ''}") if days_to is not None and days_to >= 0 else "")
                           + " — " + ", ".join(pending[:4])})
     path = case["pathology"] or {}
     if path.get("margins") == "positive":

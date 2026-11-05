@@ -11,7 +11,7 @@ from __future__ import annotations
 import html
 import json
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from . import records
@@ -47,8 +47,20 @@ def _default_period(connection: sqlite3.Connection, patient_id: int) -> str:
                                    JOIN treatment_plans p ON p.id = c.treatment_plan_id WHERE p.patient_id = ? AND c.status IN ('given', 'modified')""", (patient_id,)),
         row_or_none(connection, """SELECT MIN(f.treatment_date) AS d FROM rt_fractions f JOIN rt_courses rc ON rc.id = f.course_id
                                    WHERE rc.patient_id = ? AND rc.status IN ('active', 'on_hold', 'completed', 'discontinued', 'planned')""", (patient_id,)),
+        row_or_none(connection, """SELECT MIN(COALESCE(admission_date, surgery_date)) AS d FROM surgical_cases
+                                   WHERE patient_id = ? AND status IN ('completed', 'discharged')""", (patient_id,)),
     ) if r and r["d"]]
-    return min(starts) if starts else date.today().isoformat()
+    if not starts:
+        return date.today().isoformat()
+    # the pathway starts at the tumour board that decided on treatment, if it met shortly before the first treatment
+    board = row_or_none(connection, """SELECT MIN(note_date) AS d FROM clinical_notes WHERE patient_id = ? AND category = 'tumour_board'
+                                       AND note_date <= ? AND note_date >= ?""",
+                        (patient_id, min(starts), (date.fromisoformat(min(starts)) - timedelta(days=60)).isoformat()))
+    return min(starts + ([board["d"]] if board and board["d"] else []))
+
+
+def _long_date(value: str | None) -> str:
+    return date.fromisoformat(value).strftime("%d %b %Y") if value else ""
 
 
 def _diagnosis(facts: dict[str, Any]) -> str:
@@ -307,7 +319,9 @@ def print_html(db: str, summary_id: int, patient_id: int | None = None) -> str:
         + (f"<li>Status: {_e(x['completion']['outcome_label'])}</li>" if x["completion"] else "") + "</ul>"
         for x in c["radiotherapy"])
     surg = "".join(
-        f"<p><strong>{_e(x['procedure'])}</strong> — {_e(x['status_label'])}" + (f", {_e(x['surgery_date'])}" if x.get("surgery_date") else "")
+        f"<p><strong>{_e(x['procedure'])}</strong> — "
+        + ((("operated " if x["status"] in ("completed", "discharged") else "planned for ") + _e(_long_date(x["surgery_date"]))) if x.get("surgery_date") else _e(x["status_label"]))
+        + (f", discharged {_e(_long_date(x['discharge_date']))}" if x.get("discharge_date") else "")
         + (f" ({_e(x['approach'])})" if x.get("approach") else "") + (f", surgeon {_e(x['surgeon'])}" if x.get("surgeon") else "") + ".</p><ul>"
         + (f"<li>Findings: {_e(x['findings'])}</li>" if x.get("findings") else "")
         + (f"<li>Histopathology: {_e(x['pathology'].get('histology'))}{', ' + _e(x['stage']) if x.get('stage') else ''}"

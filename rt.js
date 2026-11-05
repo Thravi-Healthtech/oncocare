@@ -48,22 +48,17 @@ async function rtCall(method, path, body, message) {
 }
 
 /* ------------------------------------------------------------------ patient record panel */
-EXT.patientPanels.push(p => {
-  const courses = p.rt_courses || [];
-  return `<article class="panel span-full"><div class="panel-heading"><div><p class="eyebrow">Radiation oncology</p><h2>Radiotherapy courses</h2></div><button class="button primary" data-rt="new-course">+ New RT course</button></div>
-    ${courses.length ? courses.map(c => {
-      const pct = c.fractions_planned ? Math.round((c.fractions_delivered / c.fractions_planned) * 100) : 0;
-      return `<div class="plan-row">
-        <div class="plan-row-main"><strong>${esc(c.site)}</strong>
-          <small>${esc(c.prescription)}${c.technique ? ` · ${esc(c.technique)}` : ""}${c.intent ? ` · ${esc(c.intent)}` : ""}${c.start_date ? ` · from ${fmtDate(c.start_date)}` : ""}</small>
-          <div class="drug-chips">${rtPill(c.status)}${c.approved_at ? "" : '<span class="chip chip-warn">Plan not approved</span>'}${c.attention.filter(a => a.severity !== "info").slice(0, 2).map(a => `<span class="chip ${a.severity === "alert" ? "chip-alert" : "chip-warn"}">${esc(a.text.split(".")[0])}</span>`).join("")}</div>
-        </div>
-        <div class="plan-row-progress"><div class="progress-track"><span style="width:${pct}%"></span></div><small>${c.fractions_delivered}/${c.fractions_planned} fractions · ${gy(c.dose_delivered_cgy)} of ${gy(c.dose_planned_cgy)}${c.next_fraction_date ? ` · next ${fmtShort(c.next_fraction_date)}` : ""}</small></div>
-        <div class="plan-row-actions"><a class="button secondary" href="#rt/${c.id}/plan">Open course</a></div>
-      </div>`;
-    }).join("") : '<div class="queue-empty">No radiotherapy course. Create one from the case sheet: prescription by phase, set-up data and dose constraints.</div>'}
-  </article>`;
-});
+EXT.planRows.push(p => (p.rt_courses || []).map(c => {
+  const pct = c.fractions_planned ? Math.round((c.fractions_delivered / c.fractions_planned) * 100) : 0;
+  return { modality: "radiation", date: c.start_date || "", label: `RT · ${c.site}`, html: `<div class="plan-row">
+    <div class="plan-row-main"><span class="mod-tag mod-radiation">Radiation</span><strong>${esc(c.site)}</strong>
+      <small>${esc(c.prescription)}${c.technique ? ` · ${esc(c.technique)}` : ""}${c.intent ? ` · ${esc(c.intent)}` : ""}${c.start_date ? ` · from ${fmtDate(c.start_date)}` : ""}</small>
+      <div class="drug-chips">${rtPill(c.status)}${c.approved_at ? "" : '<span class="chip chip-warn">Plan not approved</span>'}${c.attention.filter(a => a.severity !== "info").slice(0, 2).map(a => `<span class="chip ${a.severity === "alert" ? "chip-alert" : "chip-warn"}">${esc(a.text.split(".")[0])}</span>`).join("")}</div>
+    </div>
+    <div class="plan-row-progress"><div class="progress-track"><span style="width:${pct}%"></span></div><small>${c.fractions_delivered}/${c.fractions_planned} fractions · ${gy(c.dose_delivered_cgy)} of ${gy(c.dose_planned_cgy)}${c.next_fraction_date ? ` · next ${fmtShort(c.next_fraction_date)}` : ""}</small></div>
+    <div class="plan-row-actions"><a class="button secondary" href="#rt/${c.id}/plan">Open course</a></div>
+  </div>` };
+}));
 EXT.patientRowChips.push(p => p.active_rt_planned ? `<span class="chip chip-teal" title="Radiotherapy fractions delivered">RT ${p.active_rt_fractions}/${p.active_rt_planned}</span>` : "");
 
 /* ------------------------------------------------------------------ render */
@@ -567,7 +562,7 @@ document.addEventListener("click", async event => {
   const R = S.RT;
   try {
     switch (action) {
-      case "new-course": return openCourseForm(false);
+      case "new-course": closeModals(); return openCourseForm(false);
       case "edit-course": return openCourseForm(true);
       case "add-phase": S.rtDraft.phases.push({ name: `Phase ${["I", "II", "III", "IV", "V", "VI"][S.rtDraft.phases.length] || S.rtDraft.phases.length + 1}`, technique: "", energy: "", dose_per_fraction_cgy: "", fractions_planned: "" }); return renderPhaseRows();
       case "remove-phase": S.rtDraft.phases.splice(Number(el.dataset.index), 1); return renderPhaseRows();

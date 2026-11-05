@@ -2,7 +2,7 @@
 /* Running summary, clinical notes, uploaded reports and discharge / end-of-treatment summaries. */
 
 const KIND_META = {
-  chemo: ["Chemo", "kind-chemo"], rt: ["Radiotherapy", "kind-rt"], rt_review: ["RT review", "kind-rt"], toxicity: ["CTCAE", "kind-tox"], labs: ["Labs", "kind-labs"],
+  chemo: ["Chemo", "kind-chemo"], rt: ["Radiotherapy", "kind-rt"], surgery: ["Surgery", "kind-sx"], surgery_note: ["Post-op", "kind-sx"], rt_review: ["RT review", "kind-rt"], toxicity: ["CTCAE", "kind-tox"], labs: ["Labs", "kind-labs"],
   complaint: ["Patient", "kind-patient"], note: ["Note", "kind-note"], document: ["Report", "kind-doc"], discharge: ["Summary", "kind-note"],
 };
 const NOTE_CATEGORIES = { progress: "Progress note", procedure: "Procedure", admission: "Admission", phone: "Phone call", counselling: "Counselling", tumour_board: "Tumour board", other: "Other" };
@@ -63,7 +63,8 @@ function snapshotHtml(d) {
     <article class="panel snap"><p class="eyebrow">On treatment</p>
       ${rt.map(c => `<div class="snap-line"><strong>Radiotherapy · ${esc(c.site)}</strong><span>${c.fractions_delivered}/${c.fractions_planned} fractions · ${gy(c.dose_delivered_cgy)} of ${gy(c.dose_planned_cgy)}</span><span class="muted small">${c.next_fraction_date ? `next ${fmtShort(c.next_fraction_date)} · ends ${fmtShort(c.projected_end_date)}` : esc(c.status.replace("_", " "))}</span><a class="text-button" href="#rt/${c.course_id}/plan">Open</a></div>`).join("")}
       ${chemo.map(c => `<div class="snap-line"><strong>${esc(c.regimen)}</strong><span>${c.cycles_given}/${c.cycles_planned} cycles given</span><span class="muted small">${c.next_cycle ? `next C${c.next_cycle.number} ${fmtShort(c.next_cycle.date)}` : ""}</span><a class="text-button" href="#plan/${c.plan_id}/cycles">Open</a></div>`).join("")}
-      ${!rt.length && !chemo.length ? '<p class="muted">No active treatment.</p>' : ""}
+      ${(d.surgery || []).filter(x => ["planned", "scheduled", "completed"].includes(x.status)).map(x => `<div class="snap-line"><strong>Surgery · ${esc(x.procedure)}</strong><span>${esc(x.status_label)}${x.surgery_date ? ` · ${fmtShort(x.surgery_date)}` : ""}</span><span class="muted small">${x.worst_clavien_dindo ? `worst Clavien–Dindo ${esc(x.worst_clavien_dindo)}` : x.stage ? esc(x.stage) : ""}</span><a class="text-button" href="#surgery/${x.case_id}/plan">Open</a></div>`).join("")}
+      ${!rt.length && !chemo.length && !(d.surgery || []).some(x => ["planned", "scheduled", "completed"].includes(x.status)) ? '<p class="muted">No active treatment.</p>' : ""}
     </article>
     <article class="panel snap"><p class="eyebrow">Toxicities (worst grade)</p>
       ${tox.length ? tox.map(t => `<div class="snap-tox">${gradeBadge(t.worst_grade, "small")}<span>${esc(t.term)}</span><span class="muted small">${fmtShort(t.date)} · ${esc(t.source)}</span></div>`).join("") : '<p class="muted">None recorded.</p>'}
@@ -83,8 +84,8 @@ function renderSummary() {
   const n = d.narrative;
   const byId = new Map(d.items.map(i => [i.id, i]));
   const narrativeSources = n ? new Map(n.sources.map(s => [s.id, s])) : byId;
-  const filters = ["all", "rt", "chemo", "toxicity", "complaint", "labs", "note", "document"];
-  const items = [...d.items].reverse().filter(i => S.summaryFilter === "all" || i.kind === S.summaryFilter || (S.summaryFilter === "rt" && i.kind === "rt_review"));
+  const filters = ["all", "surgery", "rt", "chemo", "toxicity", "complaint", "labs", "note", "document"];
+  const items = [...d.items].reverse().filter(i => S.summaryFilter === "all" || i.kind === S.summaryFilter || (S.summaryFilter === "rt" && i.kind === "rt_review") || (S.summaryFilter === "surgery" && i.kind === "surgery_note"));
   let lastDate = "";
   $("#summaryContent").innerHTML = `
     ${snapshotHtml(d)}
@@ -128,7 +129,7 @@ function renderSummary() {
 function sourceLink(i) {
   const r = i.ref || {};
   const href = r.type === "cycle" ? `#plan/${r.plan_id}/cycles` : r.type === "rt_course" ? `#rt/${r.id}/daily` : r.type === "rt_review" ? `#rt/${r.course_id}/weekly`
-    : r.type === "report" ? "#inbox" : r.type === "document" ? `/api/documents/${r.id}/file` : r.type === "discharge" ? `#discharge/${r.id}` : null;
+    : r.type === "surgery" ? `#surgery/${r.id}/plan` : r.type === "report" ? "#inbox" : r.type === "document" ? `/api/documents/${r.id}/file` : r.type === "discharge" ? `#discharge/${r.id}` : null;
   return href ? `<a class="text-button" href="${href}" ${r.type === "document" ? 'target="_blank" rel="noopener"' : ""}>Open</a>` : "<span></span>";
 }
 
@@ -182,7 +183,7 @@ function openNewDischarge(kind = "discharge") {
     body: `<fieldset class="outcome-options compact-options"><legend>Type</legend>
         <label><input type="radio" name="kind" value="discharge" ${kind === "discharge" ? "checked" : ""} /><span><strong>Discharge summary</strong><small>Admission or day-care episode</small></span></label>
         <label><input type="radio" name="kind" value="end_of_treatment" ${kind === "end_of_treatment" ? "checked" : ""} /><span><strong>End-of-treatment summary</strong><small>After a course of chemotherapy or radiotherapy</small></span></label></fieldset>
-      <div class="form-grid"><label class="field"><span>From</span><input type="date" name="period_from" max="${todayISO()}" /><small class="muted">Blank: first treatment date</small></label>
+      <div class="form-grid"><label class="field"><span>From</span><input type="date" name="period_from" max="${todayISO()}" /><small class="muted">Blank: start of treatment (or the tumour board just before it)</small></label>
       <label class="field"><span>To</span><input type="date" name="period_to" max="${todayISO()}" value="${todayISO()}" /></label></div>`,
     onSubmit: async f => {
       $("#recDialogSubmit").textContent = "Drafting…";
@@ -216,19 +217,33 @@ function renderDischarge() {
   const rt = c.radiotherapy.map(x => `<li><strong>${esc(x.site)}</strong> — ${gy(x.dose_delivered_cgy)} in ${x.fractions_delivered} of ${x.fractions_planned} fractions${x.first_date ? `, ${fmtDate(x.first_date)} to ${fmtDate(x.last_date)}` : ""}
       <ul>${x.phases.map(ph => `<li>${esc(ph.name)}: ${gy(ph.dose_per_fraction_cgy)} × ${ph.fractions_planned} ${esc(ph.technique || "")} — delivered ${ph.fractions_delivered}/${ph.fractions_planned}</li>`).join("")}
       ${x.gaps.length ? `<li>Interruptions: ${esc(x.gaps.map(g => `${fmtShort(g.date)} ${g.category || "no reason recorded"}`).join("; "))}</li>` : ""}${x.concurrent_chemo ? `<li>Concurrent ${esc(x.concurrent_chemo)}</li>` : ""}${x.completion ? `<li>${esc(x.completion.outcome_label)}</li>` : ""}</ul></li>`).join("");
+  const surg = (c.surgery || []).map(x => `<li><strong>${esc(x.procedure)}</strong> — ${x.surgery_date ? `${["completed", "discharged"].includes(x.status) ? "operated" : "planned for"} ${fmtDate(x.surgery_date)}` : esc(x.status_label)}${x.approach ? ` (${esc(x.approach)})` : ""}${x.discharge_date ? `, discharged ${fmtDate(x.discharge_date)}` : ""}
+      <ul>${x.pathology ? `<li>Histopathology: ${esc(x.pathology.histology)}${x.stage ? `, ${esc(x.stage)}` : ""}${x.pathology.margins ? `, margins ${esc(x.pathology.margins)}` : ""}</li>` : ""}
+      ${x.complications.length ? `<li>Complications: ${esc(x.complications.join("; "))}</li>` : ""}${x.length_of_stay != null ? `<li>Length of stay ${x.length_of_stay} day(s)</li>` : ""}${x.cancel_reason ? `<li>Cancelled: ${esc(x.cancel_reason)}</li>` : ""}</ul></li>`).join("");
+  const ACT_LABEL = { chemo: "Chemotherapy", rt: "Radiotherapy", rt_review: "RT review", surgery: "Surgery", surgery_note: "Post-op", toxicity: "CTCAE", labs: "Investigations", complaint: "Patient message", note: "Clinical note", document: "Report", discharge: "Summary" };
+  let lastDay = "";
+  const activity = (c.activity || []).map(a => {
+    const head = a.date !== lastDay ? `<h4 class="act-day">${fmtDate(a.date)}</h4>` : "";
+    lastDay = a.date;
+    return `${head}<label class="act-item ${a.include ? "" : "excluded"} ${a.severity ? `sev-${a.severity}` : ""}"><input type="checkbox" data-act="${esc(a.key)}" ${a.include ? "checked" : ""} ${locked ? "disabled" : ""} />
+      <span class="kind-tag ${KIND_META[a.kind]?.[1] || ""}">${esc(ACT_LABEL[a.kind] || a.kind)}</span><span><strong>${esc(a.title)}</strong><small>${esc(a.detail.replace(/\s*(\[S\d+\])+/g, ""))}</small></span></label>`;
+  }).join("");
   const fu = c.follow_up || {};
   $("#dischargeContent").innerHTML = `<div class="discharge-layout">
     <form id="dischargeForm" class="discharge-doc panel" novalidate>
       ${locked ? `<div class="locked-note">${ds.status === "final" ? `Finalised by ${esc(ds.finalised_by)} on ${fmtDateTime(ds.finalised_at)}. Create a new version to change it.` : "This version was replaced by a newer one."}</div>` : '<div class="draft-note"><strong>Draft.</strong> Sections marked <span class="from-record">From the record</span> are rebuilt from the chart; the rest is yours to edit. Medicines, condition, advice and follow-up are never generated.</div>'}
       <section><h2>Diagnosis</h2><textarea name="diagnosis" rows="2" maxlength="4000" ${locked ? "disabled" : ""}>${esc(c.diagnosis || "")}</textarea></section>
       <section><h2>Treatment given <span class="from-record">From the record</span></h2>
-        ${chemo ? `<p class="eyebrow">Chemotherapy</p><ul class="ds-list">${chemo}</ul>` : ""}${rt ? `<p class="eyebrow">Radiotherapy</p><ul class="ds-list">${rt}</ul>` : ""}${!chemo && !rt ? '<p class="muted">No treatment recorded in this period.</p>' : ""}</section>
+        ${surg ? `<p class="eyebrow">Surgery</p><ul class="ds-list">${surg}</ul>` : ""}${chemo ? `<p class="eyebrow">Chemotherapy</p><ul class="ds-list">${chemo}</ul>` : ""}${rt ? `<p class="eyebrow">Radiotherapy</p><ul class="ds-list">${rt}</ul>` : ""}${!chemo && !rt && !surg ? '<p class="muted">No treatment recorded in this period.</p>' : ""}</section>
       <section><h2>Course during treatment <span class="method-tag">${esc(METHOD_LABEL[course.method] || course.method || "")}${course.model ? ` · ${esc(course.model)}` : ""}</span></h2>
         ${course.error ? `<p class="ai-error">${esc(course.error)}</p>` : ""}
         <div class="narrative-preview">${citationHtml(course.sentences || [], sources)}</div>
         ${unsupported ? `<p class="text-amber small">${unsupported} sentence(s) cite no source — check or edit them.</p>` : ""}
         ${locked ? "" : `<details class="edit-narrative"><summary>Edit text</summary><textarea name="course_text" rows="8" maxlength="6000">${esc(course.text || "")}</textarea><p class="muted small">Keep the [S#] markers next to facts so the source stays linked. They are removed from the printed copy.</p></details>`}
       </section>
+      <section><h2>Activity during this period <span class="from-record">From the record · date order</span></h2>
+        <p class="muted small">Every treatment event, review, message, report and clinical note in this period, oldest first. ${locked ? "" : "Untick an entry to leave it out of the printed summary."}</p>
+        <div class="act-list">${activity || '<p class="muted">Nothing recorded in this period.</p>'}</div></section>
       <section><h2>Toxicities <span class="from-record">From the record</span></h2>
         ${c.toxicities.length ? `<div class="table-wrap"><table class="rt-table compact-table"><thead><tr><th>CTCAE term</th><th>Worst</th><th>Date</th><th>Recorded in</th></tr></thead><tbody>${c.toxicities.map(t => `<tr><td>${esc(t.term)}</td><td>${gradeBadge(t.worst_grade, "small")}</td><td>${fmtDate(t.date)}</td><td>${esc(t.source)}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">None recorded.</p>'}</section>
       <section><h2>Complaints between visits <span class="from-record">From the record</span></h2>
@@ -263,6 +278,7 @@ function dischargePayload() {
   const f = $("#dischargeForm").elements;
   const meds = $$("#dsMedRows tr").map(tr => Object.fromEntries($$("input", tr).map(i => [i.name, i.value.trim()]))).filter(m => Object.values(m).some(Boolean));
   const body = { diagnosis: f.diagnosis.value, condition_at_discharge: f.condition_at_discharge.value, advice: f.advice.value, medications: meds,
+    activity_excluded: $$("[data-act]").filter(x => !x.checked).map(x => x.dataset.act),
     follow_up: { date: f.fu_date.value, with: f.fu_with.value, instructions: f.fu_instructions.value, none: f.fu_none.checked } };
   if (f.course_text) body.course_text = f.course_text.value;
   return body;

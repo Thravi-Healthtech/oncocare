@@ -506,7 +506,7 @@ class SurgeryTests(Base):
         cid = w["case"]["id"]
         self.assertEqual(w["case"]["status"], "scheduled")
         self.assertEqual([x["status"] for x in w["whatsapp"]], ["sent", "scheduled"])
-        self.assertTrue(any("Pre-op checklist: 6 item(s) open, surgery in 4 day(s)" in a["text"] for a in w["summary"]["attention"]))
+        self.assertTrue(any("Pre-op checklist: 6 item(s) open; surgery in 4 days" in a["text"] for a in w["summary"]["attention"]))
         _, thread = self.call("GET", f"/api/patients/{pid}/whatsapp")
         self.assertIn("Nothing to eat or drink from 10 pm", [m for m in thread["data"]["messages"] if m["kind"] == "plan"][0]["body"])
         # Post-op notes need the operation note first; the operation note must be signed.
@@ -566,3 +566,17 @@ class SurgeryTests(Base):
         self.assertIn("Activity during this period", page)
         self.assertIn("Comfortable, wound dry.", page)
         self.assertNotIn("Family counselled", page)
+
+    def test_default_period_starts_at_tumour_board_before_surgery(self) -> None:
+        pid = self.patient("SX-4")
+        op_day = date.today() - timedelta(days=20)
+        cid = self.call("POST", f"/api/patients/{pid}/surgeries", {"procedure_planned": "Hemicolectomy", "surgery_date": op_day.isoformat(),
+                                                                   "admission_date": (op_day - timedelta(days=1)).isoformat()})[1]["data"]["case"]["id"]
+        self.call("POST", f"/api/surgeries/{cid}/operation", {"operation_date": op_day.isoformat(), "procedure_performed": "Right hemicolectomy", "surgeon": "Dr. A", "signed": True})
+        board = (op_day - timedelta(days=10)).isoformat()
+        self.call("POST", f"/api/patients/{pid}/notes", {"text": "Tumour board: proceed to surgery.", "category": "tumour_board", "note_date": board})
+        _, ds = self.call("POST", f"/api/patients/{pid}/discharge-summaries", {})
+        self.assertEqual(ds["data"]["period_from"], board)
+        titles = [a["title"] for a in ds["data"]["content"]["activity"]]
+        self.assertTrue(titles[0].startswith("Tumour board"), titles)
+        self.assertTrue(any(t.startswith("Operation: Right hemicolectomy") for t in titles), titles)

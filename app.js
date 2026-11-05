@@ -20,7 +20,7 @@ const S = {
 };
 const PLAN_VIEWS = ["cycles", "review", "labs", "toxicities", "timeline"];
 // Extension points used by rt.js (radiation oncology), records.js (summaries) and whatsapp.js.
-const EXT = { routes: {}, patientPanels: [], patientLoaders: [], navHref: {}, afterShow: [], patientRowChips: [] };
+const EXT = { routes: {}, patientPanels: [], patientLoaders: [], navHref: {}, afterShow: [], patientRowChips: [], planRows: [] };
 const UNITS = ["mg/m2", "mg/kg", "mg", "AUC", "units/m2", "g/m2", "mcg/m2"];
 const STATUS_LABEL = { planned: "Planned", given: "Given", modified: "Modified", delayed: "Delayed", held: "Held", discontinued: "Discontinued", cancelled: "Cancelled" };
 const OUTCOME_LABEL = { given: "Given as planned", modified: "Given with modification", delayed: "Delayed", held: "Not given (held)", discontinued: "Plan discontinued" };
@@ -483,22 +483,35 @@ function renderPatient() {
           "Portal access is turned off; the patient cannot sign in."}</p>
         ${(p.reports || []).length ? `<div class="report-list compact">${p.reports.slice(0, 5).map(r => reportCardHtml(r, { compact: true })).join("")}</div>` : ""}
       </article>
-      <article class="panel span-full"><div class="panel-heading"><div><p class="eyebrow">Chemotherapy</p><h2>Treatment plans</h2></div><button class="button primary" data-action="new-plan">+ Create plan</button></div>
-        ${plans.length ? plans.map(plan => {
-          const c = plan.cycle_counts;
-          const pct = c.total ? Math.round((c.given / c.total) * 100) : 0;
-          return `<div class="plan-row">
-            <div class="plan-row-main"><strong>${esc(plan.regimen_name)}</strong>
-              <small>${esc(plan.intent || "Intent not recorded")} · ${esc(plan.status.replace("_", " "))}${plan.start_date ? ` · from ${fmtDate(plan.start_date)}` : ""}${plan.cycle_interval_days ? ` · every ${plan.cycle_interval_days} days` : ""}</small>
-              <div class="drug-chips">${plan.medications.map(m => `<span class="chip">${esc(m.drug_name)} ${fmtNum(m.dose)} ${fmtUnit(m.dose_unit)}</span>`).join("")}</div>
-            </div>
-            <div class="plan-row-progress"><div class="progress-track"><span style="width:${pct}%"></span></div><small>${c.given}/${c.total} given${c.modified ? ` · ${c.modified} modified` : ""}${plan.next_cycle ? ` · next C${plan.next_cycle.cycle_number} ${fmtShort(plan.next_cycle.planned_date)}` : ""}</small></div>
-            <div class="plan-row-actions"><a class="button secondary" href="#plan/${plan.id}/cycles">Open plan</a><button class="icon-action danger" data-delete-plan="${plan.id}" title="Delete plan" aria-label="Delete plan">🗑</button></div>
-          </div>`;
-        }).join("") : '<div class="queue-empty">No chemotherapy plan yet. Create a plan to schedule cycles, drugs and doses.</div>'}
-      </article>
+      ${treatmentPlansPanel(p, plans)}
       ${EXT.patientPanels.map(fn => fn(p)).join("")}
     </div>`;
+}
+
+/* ------------------------------------------------------------------ all treatment plans (medical, surgical, radiation) */
+const MODALITY = { medical: ["Medical", "mod-medical"], surgical: ["Surgical", "mod-surgical"], radiation: ["Radiation", "mod-radiation"] };
+function chemoPlanRows(plans) {
+  return plans.map(plan => {
+    const c = plan.cycle_counts;
+    const pct = c.total ? Math.round((c.given / c.total) * 100) : 0;
+    return { modality: "medical", date: plan.start_date || plan.created_at?.slice(0, 10) || "", label: plan.regimen_name, html: `<div class="plan-row">
+      <div class="plan-row-main"><span class="mod-tag mod-medical">Medical</span><strong>${esc(plan.regimen_name)}</strong>
+        <small>${esc(plan.intent || "Intent not recorded")} · ${esc(plan.status.replace("_", " "))}${plan.start_date ? ` · from ${fmtDate(plan.start_date)}` : ""}${plan.cycle_interval_days ? ` · every ${plan.cycle_interval_days} days` : ""}</small>
+        <div class="drug-chips">${plan.medications.map(m => `<span class="chip">${esc(m.drug_name)} ${fmtNum(m.dose)} ${fmtUnit(m.dose_unit)}</span>`).join("")}</div>
+      </div>
+      <div class="plan-row-progress"><div class="progress-track"><span style="width:${pct}%"></span></div><small>${c.given}/${c.total} cycles given${c.modified ? ` · ${c.modified} modified` : ""}${plan.next_cycle ? ` · next C${plan.next_cycle.cycle_number} ${fmtShort(plan.next_cycle.planned_date)}` : ""}</small></div>
+      <div class="plan-row-actions"><a class="button secondary" href="#plan/${plan.id}/cycles">Open plan</a><button class="icon-action danger" data-delete-plan="${plan.id}" title="Delete plan" aria-label="Delete plan">🗑</button></div>
+    </div>` };
+  });
+}
+function treatmentPlansPanel(p, plans) {
+  const rows = [...chemoPlanRows(plans), ...EXT.planRows.flatMap(fn => fn(p))].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
+  const counts = Object.keys(MODALITY).map(m => [m, rows.filter(r => r.modality === m).length]);
+  return `<article class="panel span-full"><div class="panel-heading"><div><p class="eyebrow">Care pathway · ${counts.filter(([, n]) => n).map(([m, n]) => `${n} ${MODALITY[m][0].toLowerCase()}`).join(" · ") || "no plans yet"}</p><h2>Treatment plans</h2></div>
+      <button class="button primary" data-action="choose-plan">+ New plan</button></div>
+    ${rows.length > 1 ? `<ol class="pathway">${rows.map(r => `<li class="${MODALITY[r.modality][1]}"><span>${MODALITY[r.modality][0]}</span><strong>${esc(r.label)}</strong><small>${r.date ? fmtDate(r.date) : "date not set"}</small></li>`).join("")}</ol>` : ""}
+    ${rows.length ? rows.map(r => r.html).join("") : '<div class="queue-empty">No treatment plan yet. Add medical (chemotherapy), surgical or radiation plans — as many of each as the patient needs.</div>'}
+  </article>`;
 }
 
 /* ------------------------------------------------------------------ plan builder */
@@ -1485,7 +1498,8 @@ document.addEventListener("click", async event => {
     case "retry-patients": return loadPatients();
     case "edit-patient": return openPatientForm(S.patient);
     case "delete-patient": return deletePatient(S.patient.id);
-    case "new-plan": return openPlanForm(false);
+    case "new-plan": closeModals(); return openPlanForm(false);
+    case "choose-plan": return openModal("choosePlanModal");
     case "edit-plan": return openPlanForm(true);
     case "add-plan-med": S.planDraft.meds.push(newMed()); return renderPlanMeds();
     case "plan-back": closeModals(); openModal("planModal"); return renderPlanMeds();

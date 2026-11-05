@@ -131,7 +131,7 @@ When the patient describes their symptoms by **voice**, the check-in continues a
 
 The spoken questions need a text-to-speech voice for the language on the patient's device. Chrome and Safari usually have Hindi; for Telugu on a Mac, add a voice in System Settings › Accessibility › Spoken Content › System voice › Manage voices. Without one, the questions are shown on screen and the patient can still answer by speaking. Use Chrome, Edge or Safari for speech recognition.
 
-## v0.9: Radiation oncology, running summary, discharge summaries, WhatsApp
+## v0.9: Radiation and surgical oncology, unified plans, running summary, discharge summaries, WhatsApp
 
 ### Radiation oncology (from the paper RT case sheet)
 Open a patient → **Radiotherapy courses → + New RT course**. The course workspace has four pages (sidebar):
@@ -143,11 +143,19 @@ Open a patient → **Radiotherapy courses → + New RT course**. The course work
 
 New CTCAE terms carry the v5.0 text forward (marked as such) until the NCI v6.0 workbook is imported. The patient portal shows radiotherapy in plain language (sessions done, next session, expected last session).
 
+### Surgical oncology
+**+ New plan** on the patient record offers **Medical** (chemotherapy), **Surgical** or **Radiation**; one patient can have any number of each, shown together in date order with a pathway strip. A surgical case has four pages:
+- **Plan & pre-op**: procedure, intent, urgency, site and side, surgeon, admission and surgery dates, ASA grade, comorbidities, a 7-item pre-op checklist (consent, anaesthesia fitness, imaging, tumour board, blood, site marking, fasting) and fasting/special instructions. Open checklist items close to the surgery date are flagged.
+- **Operation note**: date, procedure performed, approach, anaesthesia, duration, team, incision, findings, procedure details, frozen section, specimens, blood loss, transfusion, drains, intra-operative events. It must be signed.
+- **Post-op course**: dated notes by post-operative day (progress, drain, wound, complication, return to theatre, readmission) with pain score and drain output. Complications, returns to theatre and readmissions need a **Clavien–Dindo** grade; the worst grade and length of stay are computed.
+- **Pathology & discharge**: histology, grade, size, margins (closest margin), pT/pN, nodes positive/examined (checked), LVI, PNI, biomarkers; then discharge with condition, drains, wound care, suture removal and follow-up dates.
+Creating or rescheduling a case can send the date, admission and fasting instructions on WhatsApp with a reminder before admission; discharge can send a follow-up reminder. The patient portal shows the operation in plain language (no grades or internal notes).
+
 ### Running summary
 Patient record → **Open running summary** (or sidebar **Running summary**). It shows what the patient is on now, worst toxicities, open messages and abnormal labs, and a **timeline** of every source item (chemo cycles and decisions, radiotherapy weeks, missed days and weekly reviews, CTCAE toxicities, lab panels, patient messages from the portal or WhatsApp with their interpretation and outcome, clinical notes, uploaded reports). **Generate summary** writes a short narrative from those sources only: with AI on, Claude writes it; otherwise fixed rules do. **Every sentence cites its sources** (S1, S2…, clickable); sentences without a valid source are highlighted for checking. Clinical notes and uploaded reports (imaging, histopathology, referral…; text extracted, optional AI summary) are added from the same page.
 
 ### Discharge / end-of-treatment summary
-**Create discharge summary** → choose type and period → a **draft** is built from the record: treatment given (chemo and radiotherapy with phases, interruptions, completion), course during treatment (cited narrative), toxicities, complaints between visits and how they were handled, investigations and reports. The clinician edits the diagnosis and narrative and enters **condition at discharge, medicines, advice and follow-up** (never generated). **Review & finalise** checks required sections and locks the summary; changes need a **new version** (the previous one is marked superseded). **Print / PDF** opens a printable page (citations removed). Finalised summaries appear in the patient portal.
+**Create discharge summary** → choose type and period (blank = from the first treatment, or the tumour board just before it) → a **draft** is built from the record: treatment given (surgery with histopathology, complications and length of stay; chemo; radiotherapy with phases, interruptions, completion), **activity during this period** (every treatment event, post-op note, review, message, report and clinical note in date order, each with a tick box to leave it out of the printed copy), course during treatment (cited narrative), toxicities, complaints between visits and how they were handled, investigations and reports. The clinician edits the diagnosis and narrative and enters **condition at discharge, medicines, advice and follow-up** (never generated). **Review & finalise** checks required sections and locks the summary; changes need a **new version** (the previous one is marked superseded). **Print / PDF** opens a printable page (citations removed). Finalised summaries appear in the patient portal.
 
 ### WhatsApp agent
 Sidebar **WhatsApp**. Default `WHATSAPP_MODE=simulator`: nothing leaves the server; the phone panel lets you type, tap buttons or record a voice note *as the patient*.
@@ -197,6 +205,7 @@ python3 -m unittest discover -s tests -v
 | Labs | `GET|POST /api/cycles/{id}/labs` (single or `results[]`), `GET|POST /api/cycles/{id}/lab-documents`, `GET /api/lab-documents/{id}/file`, `GET|PATCH|DELETE /api/labs/{id}`, `POST /api/labs/{id}/verify`, `GET /api/patients/{id}/lab-trends` |
 | Symptoms | `GET|POST /api/patients/{id}/symptoms`, `GET|PATCH|DELETE /api/symptoms/{id}` |
 | Analysis | `GET /api/treatment-plans/{id}/longitudinal` — cycles, windows, lab trends, CTCAE with reasoning, matrix, attention items |
+| Surgery | `GET /api/surgery/options`, `GET|POST /api/patients/{id}/surgeries`, `GET|PATCH|DELETE /api/surgeries/{id}`, `POST /api/surgeries/{id}/operation`, `POST /api/surgeries/{id}/events`, `DELETE /api/surgery-events/{id}`, `POST /api/surgeries/{id}/pathology`, `POST /api/surgeries/{id}/discharge`, `GET /api/portal/surgery` |
 
 ## Code map
 
@@ -204,6 +213,7 @@ python3 -m unittest discover -s tests -v
 - `backend/analysis.py`: deterministic lab grading, baseline trends, per-window CTCAE with reasoning, and the longitudinal build.
 - `backend/extraction.py`: text/PDF text-layer parsing, the optional Claude adapter, and unit normalisation.
 - `backend/api.py`, `backend/database.py`: routes, schema, migrations and synthetic seed data.
+- `backend/surgery.py`, `surgery.js`: surgical cases (plan and pre-op, operation note, post-op course with Clavien–Dindo, histopathology, discharge).
 - `index.html`, `app.js`, `styles.css`: single-page UI with hash routes (`#patients`, `#patient/{id}`, `#plan/{id}/{cycles|review|labs|toxicities|timeline}`).
 
 ## Prototype assumptions and limits

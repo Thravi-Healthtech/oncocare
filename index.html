@@ -40,6 +40,13 @@
             <a class="nav-item" data-nav="patient" href="#"><span class="nav-icon">◉</span><span>Patient record</span></a>
             <a class="nav-item" data-nav="summary" href="#"><span class="nav-icon">≡</span><span>Running summary</span></a>
           </div>
+          <div id="navSX" class="nav-group hidden">
+            <p class="nav-caption" id="navSXName">Surgery</p>
+            <a class="nav-item" data-nav="sx-plan" href="#"><span class="nav-icon">◎</span><span>Plan &amp; pre-op</span></a>
+            <a class="nav-item" data-nav="sx-operation" href="#"><span class="nav-icon">✚</span><span>Operation note</span></a>
+            <a class="nav-item" data-nav="sx-postop" href="#"><span class="nav-icon">▤</span><span>Post-op course</span></a>
+            <a class="nav-item" data-nav="sx-pathology" href="#"><span class="nav-icon">✓</span><span>Pathology &amp; discharge</span></a>
+          </div>
           <div id="navRT" class="nav-group hidden">
             <p class="nav-caption" id="navRTName">Radiotherapy</p>
             <a class="nav-item" data-nav="rt-plan" href="#"><span class="nav-icon">◎</span><span>Prescription &amp; plan</span></a>
@@ -214,6 +221,39 @@
               <div><p class="eyebrow">Radiation oncology</p><h1 id="rtCompleteTitle">Completion summary</h1><p class="rt-subtitle"></p></div>
             </div>
             <div id="rtComplete"></div>
+          </section>
+
+          <!-- Surgical oncology -->
+          <section class="view" data-view="sx-plan" aria-labelledby="sxplanTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Surgical oncology</p><h1 id="sxplanTitle">Plan &amp; pre-op</h1><p class="sx-subtitle"></p></div>
+              <div class="heading-actions" id="sxplanActions"></div>
+            </div>
+            <div id="sxplan"></div>
+          </section>
+
+          <section class="view" data-view="sx-operation" aria-labelledby="sxoperationTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Surgical oncology</p><h1 id="sxoperationTitle">Operation note</h1><p class="sx-subtitle"></p></div>
+              <div class="heading-actions" id="sxoperationActions"></div>
+            </div>
+            <div id="sxoperation"></div>
+          </section>
+
+          <section class="view" data-view="sx-postop" aria-labelledby="sxpostopTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Surgical oncology</p><h1 id="sxpostopTitle">Post-operative course</h1><p class="sx-subtitle"></p></div>
+              <div class="heading-actions" id="sxpostopActions"></div>
+            </div>
+            <div id="sxpostop"></div>
+          </section>
+
+          <section class="view" data-view="sx-pathology" aria-labelledby="sxpathologyTitle">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">Surgical oncology</p><h1 id="sxpathologyTitle">Histopathology &amp; discharge</h1><p class="sx-subtitle"></p></div>
+              <div class="heading-actions" id="sxpathologyActions"></div>
+            </div>
+            <div id="sxpathology"></div>
           </section>
 
           <!-- Running summary -->
@@ -450,6 +490,19 @@
       </div>
     </div>
 
+    <!-- Choose the kind of plan -->
+    <div class="modal" id="choosePlanModal" role="dialog" aria-modal="true" aria-labelledby="choosePlanTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card large">
+        <div class="modal-heading"><div><p class="eyebrow">Treatment plans</p><h2 id="choosePlanTitle">Add a treatment plan</h2><p class="muted">A patient can have any number of medical, surgical and radiation plans; they appear together in date order.</p></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <div class="plan-chooser">
+          <button type="button" class="plan-choice mod-medical" data-action="new-plan"><span class="mod-tag mod-medical">Medical</span><strong>Chemotherapy plan</strong><small>Regimen, cycles, drugs and doses; pre-cycle labs and CTCAE review</small></button>
+          <button type="button" class="plan-choice mod-surgical" data-sx="new-case"><span class="mod-tag mod-surgical">Surgical</span><strong>Surgery</strong><small>Planned procedure, pre-op checklist, operation note, post-op course, histopathology, discharge</small></button>
+          <button type="button" class="plan-choice mod-radiation" data-rt="new-course"><span class="mod-tag mod-radiation">Radiation</span><strong>Radiotherapy course</strong><small>Prescription by phase, plan approval, daily fractions, weekly review</small></button>
+        </div>
+      </div>
+    </div>
+
     <!-- Radiotherapy course (create / edit) -->
     <div class="modal" id="rtCourseModal" role="dialog" aria-modal="true" aria-labelledby="rtCourseTitle" hidden>
       <div class="modal-backdrop" data-close-modal></div>
@@ -504,6 +557,19 @@
           <div id="rtDialogBody"></div>
           <p class="form-error" role="alert" hidden></p>
           <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit" id="rtDialogSubmit">Save</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Surgery dialog (case, operation note, post-op note, pathology, discharge) -->
+    <div class="modal" id="sxDialog" role="dialog" aria-modal="true" aria-labelledby="sxDialogTitle" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card preview-modal">
+        <div class="modal-heading"><div><p class="eyebrow" id="sxDialogEyebrow">Surgical oncology</p><h2 id="sxDialogTitle">Surgery</h2><p class="muted" id="sxDialogSub"></p></div><button class="close-button" data-close-modal aria-label="Close">×</button></div>
+        <form id="sxDialogForm" novalidate>
+          <div id="sxDialogBody"></div>
+          <p class="form-error" role="alert" hidden></p>
+          <div class="modal-actions"><button class="button secondary" type="button" data-close-modal>Cancel</button><button class="button primary" type="submit" id="sxDialogSubmit">Save</button></div>
         </form>
       </div>
     </div>
@@ -574,6 +640,7 @@
     <datalist id="rtImmobList"><option value="Aquaplast mask"><option value="Vacloc"><option value="Breast board"><option value="Knee-and-foot rest"><option value="Thermoplastic pelvic mould"></datalist>
     <script src="/app.js"></script>
     <script src="/rt.js"></script>
+    <script src="/surgery.js"></script>
     <script src="/records.js"></script>
     <script src="/whatsapp.js"></script>
   </body>

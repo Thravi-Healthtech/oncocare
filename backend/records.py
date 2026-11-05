@@ -373,8 +373,9 @@ def collect(connection: sqlite3.Connection, patient_id: int, period_from: str | 
                     + (f" (Clavien–Dindo {e['clavien_dindo']})" if e["clavien_dindo"] else "") + f" — {e['author']}",
                     e["text"] + (f" Drain {e['drain_output_ml']:g} ml." if e["drain_output_ml"] is not None else "") + (f" Pain {e['pain_score']}/10." if e["pain_score"] is not None else ""),
                     ref, "alert" if e["clavien_dindo"] and sx.CD_ORDER.index(e["clavien_dindo"]) >= 2 else "warning" if e["clavien_dindo"] else None)
-        relevant = [d for d in (c["surgery_date"], c["admission_date"], c["discharge_date"], c["created_at"][:10]) if d]
-        if any(within(d) for d in relevant) or not period_from:
+        relevant = [d for d in (c["surgery_date"], c["admission_date"], c["discharge_date"]) if d]
+        # a case belongs to the period if a clinical date falls in it, or it is still open (planned, scheduled, in hospital)
+        if any(within(d) for d in relevant) or not period_from or (c["status"] in ("planned", "scheduled", "completed") and not relevant):
             surgeries.append({"case_id": c["id"], "procedure_planned": c["procedure_planned"], "procedure": op.get("procedure_performed") or c["procedure_planned"],
                               "status": c["status"], "status_label": c["status_label"], "intent": c["intent"], "surgeon": op.get("surgeon") or c["surgeon"],
                               "surgery_date": c["surgery_date"], "admission_date": c["admission_date"], "discharge_date": c["discharge_date"],

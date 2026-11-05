@@ -69,9 +69,9 @@ async function start() {
   route();
 }
 async function refresh() {
-  const [plans, labs, reports, bank, radiotherapy, summaries] = await Promise.all([api("/api/portal/plans"), api("/api/portal/labs"), api("/api/portal/reports"),
-    P.bank ? Promise.resolve(P.bank) : api("/api/portal/checkin/bank"), api("/api/portal/radiotherapy").catch(() => []), api("/api/portal/summaries").catch(() => [])]);
-  Object.assign(P, { plans, labs, reports, bank, radiotherapy, summaries });
+  const [plans, labs, reports, bank, radiotherapy, summaries, surgery] = await Promise.all([api("/api/portal/plans"), api("/api/portal/labs"), api("/api/portal/reports"),
+    P.bank ? Promise.resolve(P.bank) : api("/api/portal/checkin/bank"), api("/api/portal/radiotherapy").catch(() => []), api("/api/portal/summaries").catch(() => []), api("/api/portal/surgery").catch(() => [])]);
+  Object.assign(P, { plans, labs, reports, bank, radiotherapy, summaries, surgery });
   renderHome(); renderPlan(); renderReports(); renderHistory();
 }
 function route() {
@@ -98,6 +98,16 @@ function renderHome() {
       <p class="small">${rt.sessions_done} of ${rt.sessions_total} sessions done${rt.last_session ? ` · last session expected ${fmtDate(rt.last_session, { day: "numeric", month: "short" })}` : ""}</p>
     </article>`);
   }
+  const op = (P.surgery || []).find(c => ["Planned", "Scheduled", "Done — in hospital"].includes(c.status));
+  if (op) {
+    const days = op.surgery_date ? daysUntil(op.surgery_date) : null;
+    cards.push(`<article class="card hero">
+      <p class="eyebrow">Surgery · ${esc(op.status)}</p>
+      <div class="big">${op.status === "Done — in hospital" ? "Recovering after surgery" : op.surgery_date ? `Operation ${fmtDate(op.surgery_date, { weekday: "short", day: "numeric", month: "short" })}` : "Date to be confirmed"}</div>
+      <p>${esc(op.procedure)}${days !== null && days >= 0 && op.status !== "Done — in hospital" ? ` · ${days === 0 ? "today" : `in ${days} day${days === 1 ? "" : "s"}`}` : ""}</p>
+      ${op.admission_date && op.status !== "Done — in hospital" ? `<p class="small">Come for admission on ${fmtDate(op.admission_date, { weekday: "short", day: "numeric", month: "short" })}${op.fasting_from ? ` · nothing to eat from ${esc(op.fasting_from)}` : ""}</p>` : ""}
+    </article>`);
+  }
   const finalSummary = (P.summaries || [])[0];
   if (finalSummary) cards.push(`<article class="card cta"><div><p class="eyebrow">From your doctor</p><h2>${esc(finalSummary.title)}</h2><p class="muted small">${finalSummary.follow_up?.date ? `Next visit ${fmtDate(finalSummary.follow_up.date)}` : `Finalised ${fmtDate(finalSummary.finalised_at)}`}</p></div><a class="button secondary" href="#plan">View</a></article>`);
   if (plan) {
@@ -111,7 +121,7 @@ function renderHome() {
       <div class="progress" aria-label="${plan.given} of ${plan.cycles.length} cycles given"><span style="width:${pct}%"></span></div>
       <p class="small">${plan.given} of ${plan.cycles.length} cycles given</p>
     </article>`);
-  } else if (!rt) {
+  } else if (!rt && !op) {
     cards.push(`<article class="card"><h2>No treatment plan yet</h2><p class="muted">Your care team will add your plan here.</p></article>`);
   }
   const replies = P.reports.filter(r => r.patient_message).slice(0, 1);
@@ -133,6 +143,14 @@ function renderPlan() {
       <div class="progress" aria-label="${c.sessions_done} of ${c.sessions_total} sessions"><span style="width:${c.sessions_total ? Math.round(c.sessions_done / c.sessions_total * 100) : 0}%"></span></div>
       <p class="small">${c.sessions_done} of ${c.sessions_total} sessions done${c.next_session ? ` · next ${fmtDate(c.next_session, { weekday: "short", day: "numeric", month: "short" })}` : ""}${c.last_session ? ` · last expected ${fmtDate(c.last_session, { day: "numeric", month: "short" })}` : ""}</p>
     </article>`).join("");
+  const sxCards = (P.surgery || []).map(c => `<article class="card">
+      <div class="pills"><span class="pill ${c.status === "Done" ? "" : "ok"}">${esc(c.status)}</span></div>
+      <h2 style="margin-top:10px">Surgery · ${esc(c.procedure)}</h2>
+      <p class="muted small">${c.surgery_date ? `${c.status.startsWith("Done") ? "Operated" : "Planned for"} ${fmtDate(c.surgery_date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}` : "Date to be confirmed"}${c.surgeon ? ` · ${esc(c.surgeon)}` : ""}</p>
+      ${c.status === "Planned" || c.status === "Scheduled" ? `<div class="drug-list">${c.admission_date ? `<div><strong>Admission</strong><span>${fmtDate(c.admission_date, { weekday: "short", day: "numeric", month: "short" })}</span></div>` : ""}${c.fasting_from ? `<div><strong>Stop eating and drinking</strong><span>from ${esc(c.fasting_from)}</span></div>` : ""}</div>${c.instructions ? `<p>${esc(c.instructions)}</p>` : ""}` : ""}
+      ${c.discharge_date ? `<div class="drug-list"><div><strong>Went home</strong><span>${fmtDate(c.discharge_date)}</span></div>${c.suture_removal_date ? `<div><strong>Stitches out</strong><span>${fmtDate(c.suture_removal_date)}</span></div>` : ""}${c.follow_up_date ? `<div><strong>Next visit</strong><span>${fmtDate(c.follow_up_date)}</span></div>` : ""}</div>` : ""}
+      ${c.wound_care ? `<h3>Wound care</h3><p>${esc(c.wound_care)}</p>` : ""}${c.discharge_instructions ? `<h3>At home</h3><p>${esc(c.discharge_instructions)}</p>` : ""}
+    </article>`).join("");
   const docs = (P.summaries || []).map(d => `<article class="card">
       <p class="eyebrow">From your doctor · ${fmtDate(d.finalised_at)}</p><h2>${esc(d.title)}</h2>
       ${d.medications.length ? `<h3>Your medicines</h3><div class="drug-list">${d.medications.map(m => `<div><strong>${esc(m.name)} ${esc(m.dose || "")}</strong><span>${esc([m.frequency, m.duration ? `for ${m.duration}` : "", m.instructions].filter(Boolean).join(" · "))}</span></div>`).join("")}</div>` : ""}
@@ -140,8 +158,8 @@ function renderPlan() {
       ${d.follow_up?.date ? `<p><strong>Next visit:</strong> ${fmtDate(d.follow_up.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}${d.follow_up.with ? ` with ${esc(d.follow_up.with)}` : ""}</p>` : ""}
       <a class="button secondary" href="/api/portal/summaries/${d.id}/print" target="_blank" rel="noopener">View / download</a>
     </article>`).join("");
-  if (!P.plans.length && !rtCards && !docs) { $("#planContent").innerHTML = '<div class="empty">No treatment plan has been added yet.</div>'; return; }
-  $("#planContent").innerHTML = docs + rtCards + P.plans.map(plan => `<article class="card">
+  if (!P.plans.length && !rtCards && !docs && !sxCards) { $("#planContent").innerHTML = '<div class="empty">No treatment plan has been added yet.</div>'; return; }
+  $("#planContent").innerHTML = docs + sxCards + rtCards + P.plans.map(plan => `<article class="card">
       <div class="pills"><span class="pill ${plan.status === "active" ? "ok" : ""}">${esc(plan.status.replace("_", " "))}</span>${plan.cycle_interval_days ? `<span class="pill">every ${plan.cycle_interval_days} days</span>` : ""}</div>
       <h2 style="margin-top:10px">${esc(plan.regimen_name)}</h2>
       <p class="muted small">${plan.start_date ? `Started ${fmtDate(plan.start_date)}` : ""}</p>

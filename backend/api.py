@@ -1419,7 +1419,7 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             pages = {"": "home.html", "/": "home.html", "/clinician": "index.html", "/clinician/": "index.html", "/portal": "portal.html", "/portal/": "portal.html"}
             relative = pages.get(request_path, request_path.lstrip("/"))
             if relative not in {"home.html", "home.css", "index.html", "app.js", "styles.css", "favicon.ico", "portal.html", "portal.js", "portal.css",
-                                "rt.js", "records.js", "whatsapp.js"}:
+                                "rt.js", "surgery.js", "records.js", "whatsapp.js"}:
                 return self._json(404, {"error": {"message": "Not found"}})
             target = (web_root / relative).resolve()
             if web_root not in target.parents and target != web_root:
