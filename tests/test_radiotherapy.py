@@ -357,6 +357,30 @@ class WhatsAppTests(Base):
         inbound = [m for m in thread["data"]["messages"] if m["direction"] == "in"]
         self.assertEqual(len(inbound), 1)
 
+    def test_shared_number_ignores_other_numbers_and_unknown_senders(self) -> None:
+        os.environ.update({"WHATSAPP_PHONE_NUMBER_ID": "111", "WHATSAPP_SHARED_NUMBER": "1"})
+        try:
+            def event(number_id: str, sender: str, wamid: str) -> dict:
+                return {"entry": [{"changes": [{"value": {"metadata": {"phone_number_id": number_id},
+                                                          "messages": [{"from": sender, "id": wamid, "type": "text", "text": {"body": "bill?"}}]}}]}]}
+            with transaction(self.db) as connection:
+                before = connection.execute("SELECT COUNT(*) AS n FROM whatsapp_messages").fetchone()["n"]
+            # another number on the same app: skipped entirely
+            status, body = self.call("POST", "/api/whatsapp/webhook", event("222", "91" + self.phone, "wamid.OTHER"))
+            self.assertEqual((status, body["received"]), (200, 0))
+            # our number, sender not an OncoCare patient: neither stored nor answered
+            status, body = self.call("POST", "/api/whatsapp/webhook", event("111", "919999999991", "wamid.STRANGER"))
+            self.assertEqual(status, 200)
+            with transaction(self.db) as connection:
+                self.assertEqual(connection.execute("SELECT COUNT(*) AS n FROM whatsapp_messages").fetchone()["n"], before)
+            # our number, known patient: handled as usual
+            self.call("POST", "/api/whatsapp/webhook", event("111", "91" + self.phone, "wamid.OURS"))
+            _, thread = self.call("GET", f"/api/patients/{self.pid}/whatsapp")
+            self.assertTrue(any(m.get("wa_message_id") == "wamid.OURS" for m in thread["data"]["messages"]))
+        finally:
+            for key in ("WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_SHARED_NUMBER"):
+                os.environ.pop(key, None)
+
     def test_share_plan_requires_active_treatment(self) -> None:
         self.call("POST", f"/api/patients/{self.pid}/whatsapp/consent", {"opt_in": True, "method": "in_clinic_verbal"})
         status, _ = self.call("POST", f"/api/patients/{self.pid}/whatsapp/compose", {"kind": "plan"})
