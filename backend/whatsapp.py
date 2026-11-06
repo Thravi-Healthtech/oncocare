@@ -64,11 +64,17 @@ def live_ready() -> bool:
     return bool(_env("WHATSAPP_TOKEN") and _env("WHATSAPP_PHONE_NUMBER_ID"))
 
 
+def shared_number() -> bool:
+    """True when the WhatsApp number is also used by another Thravi product: unknown senders then get no automatic reply."""
+    return _env("WHATSAPP_SHARED_NUMBER").lower() in {"1", "true", "yes"}
+
+
 def status() -> dict[str, Any]:
     m = mode()
     return {"mode": m, "live_ready": live_ready(), "display_number": _env("WHATSAPP_DISPLAY_NUMBER") or None, "clinic": clinic(),
             "care_phone": care_phone() or None, "webhook_path": "/api/whatsapp/webhook", "template_language": _env("WHATSAPP_TEMPLATE_LANG", "en"),
             "webhook_signed": bool(_env("WHATSAPP_APP_SECRET")), "verify_token_set": bool(_env("WHATSAPP_VERIFY_TOKEN")),
+            "shared_number": shared_number(),
             "agent": "AI agent (guarded)" if agent.available() else "Rule-based (AI off)", "speech": speech.status(),
             "note": None if m == "simulator" or live_ready() else "WHATSAPP_MODE=live but WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID are not set; sends will fail."}
 
@@ -186,16 +192,16 @@ def _lang(patient: dict[str, Any] | None, text: str = "") -> str:
 # ---------------------------------------------------------------------------------------------- templates (live mode)
 TEMPLATES: dict[str, dict[str, Any]] = {
     "plan": {"name": "oncocare_treatment_plan", "category": "UTILITY",
-             "body": "Hello {{1}}, here is your treatment plan from {{2}}: {{3}}. Reply to this message if you have symptoms or questions.",
+             "body": "Hello {{1}}, here is your treatment plan from {{2}}. Plan details: {{3}}. Reply to this message if you have symptoms or questions.",
              "example": ["Lakshmi", "Thravi OncoCare", "Radiotherapy to the right breast, 20 sessions Mon–Sat, 19 done, next session Thu 05 Nov"]},
     "prescription": {"name": "oncocare_prescription", "category": "UTILITY",
-                     "body": "Hello {{1}}, these are the medicines prescribed by {{2}}: {{3}}. Take them as advised and reply here if you have questions.",
+                     "body": "Hello {{1}}, here are the medicines prescribed by {{2}} for you: {{3}}. Take them as advised and reply here if you have questions.",
                      "example": ["Lakshmi", "Dr. P. Rao", "Paracetamol 650 mg, 1 tablet three times a day for 5 days"]},
     "discharge": {"name": "oncocare_discharge_summary", "category": "UTILITY",
                   "body": "Hello {{1}}, your {{2}} from {{3}} is ready. You can view and download it in the patient portal at {{4}} or ask us for a printed copy.",
                   "example": ["Lakshmi", "discharge summary", "Thravi OncoCare", "https://onco.thravi.in/portal"]},
     "reminder": {"name": "oncocare_visit_reminder", "category": "UTILITY",
-                 "body": "Hello {{1}}, this is a reminder of your visit at {{2}} on {{3}}. {{4}} Reply here if you need to reschedule or have new symptoms.",
+                 "body": "Hello {{1}}, this is a reminder of your visit at {{2}} on {{3}}. Note from the care team: {{4}} Reply here if you need to reschedule or have new symptoms.",
                  "example": ["Lakshmi", "Thravi OncoCare", "Mon 16 Nov 2026, 10:00 AM", "Purpose: follow-up after radiotherapy."]},
     "reply": {"name": "oncocare_care_team_reply", "category": "UTILITY",
               "body": "Hello {{1}}, your care team at {{2}} replied to your message: {{3}}. Reply here if you have more questions.",
@@ -897,6 +903,10 @@ def receive(db: str, wa_from: str, text: str | None = None, audio: tuple[bytes, 
         if wa_message_id and row_or_none(connection, "SELECT 1 FROM whatsapp_messages WHERE wa_message_id = ?", (wa_message_id,)):
             return {"duplicate": True}
         patient = row_or_none(connection, "SELECT * FROM patients WHERE phone = ?", (digits,)) if digits else None
+        if not patient and shared_number():
+            # The number is shared with another Thravi product: a sender we don't know is probably that product's
+            # user, so OncoCare neither stores the message nor answers it.
+            return {"matched": False, "ignored": "shared_number"}
         lang = _lang(patient, text)
         if audio and transcript_method == "sarvam" and heard_lang in LANGS:
             lang = heard_lang
@@ -1192,6 +1202,9 @@ def handle_webhook(db: str, raw: bytes, signature: str | None, upload_dir: Path)
     for entry in payload.get("entry", []) or []:
         for change in entry.get("changes", []) or []:
             value = change.get("value") or {}
+            ours = _env("WHATSAPP_PHONE_NUMBER_ID")
+            if ours and str((value.get("metadata") or {}).get("phone_number_id") or "") != ours:
+                continue  # an event for another number on the same app (another Thravi product): not ours
             for st in value.get("statuses", []) or []:
                 with transaction(db) as connection:
                     connection.execute("UPDATE whatsapp_messages SET status = ?, error = ?, updated_at = ? WHERE wa_message_id = ?",

@@ -34,6 +34,31 @@ python3 -c 'import sys; assert sys.version_info >= (3, 10), sys.version' || { lo
 # 3. Environment file (secrets come from SSM Parameter Store, never from the repo)
 PW=$($AWS ssm get-parameter --region "$REGION" --name /oncocare/demo_password --with-decryption --query Parameter.Value --output text)
 KEY=$($AWS ssm get-parameter --region "$REGION" --name /oncocare/anthropic_api_key --with-decryption --query Parameter.Value --output text 2>/dev/null || true)
+# Optional settings: written to the env file only when the SSM parameter exists (missing ones keep the app defaults,
+# e.g. WhatsApp stays in simulator mode until /oncocare/whatsapp/mode is "live").
+OPTIONAL_PARAMS="
+/oncocare/sarvam_api_key:SARVAM_API_KEY
+/oncocare/whatsapp/mode:WHATSAPP_MODE
+/oncocare/whatsapp/token:WHATSAPP_TOKEN
+/oncocare/whatsapp/phone_number_id:WHATSAPP_PHONE_NUMBER_ID
+/oncocare/whatsapp/display_number:WHATSAPP_DISPLAY_NUMBER
+/oncocare/whatsapp/verify_token:WHATSAPP_VERIFY_TOKEN
+/oncocare/whatsapp/app_secret:WHATSAPP_APP_SECRET
+/oncocare/whatsapp/api_version:WHATSAPP_API_VERSION
+/oncocare/whatsapp/template_lang:WHATSAPP_TEMPLATE_LANG
+/oncocare/whatsapp/shared_number:WHATSAPP_SHARED_NUMBER
+/oncocare/clinic_name:ONCOCARE_CLINIC_NAME
+/oncocare/care_phone:ONCOCARE_CARE_PHONE
+"
+optional_env() {
+  local pair name var value
+  for pair in $OPTIONAL_PARAMS; do
+    name="${pair%%:*}"; var="${pair##*:}"
+    value=$($AWS ssm get-parameter --region "$REGION" --name "$name" --with-decryption --query Parameter.Value --output text 2>/dev/null || true)
+    [ -n "$value" ] && [ "$value" != "None" ] && echo "$var=$value"
+  done
+  true
+}
 umask 077
 {
   echo "ONCOCARE_PUBLIC=1"
@@ -43,7 +68,7 @@ umask 077
   echo "ONCOCARE_CONTEXT_DIR=$DATA/context"
   echo "PYTHONDONTWRITEBYTECODE=1"
   [ -n "$KEY" ] && [ "$KEY" != "None" ] && echo "ANTHROPIC_API_KEY=$KEY"
-  true
+  optional_env
 } > "$DATA/oncocare.env"
 chown oncocare:oncocare "$DATA/oncocare.env"; chmod 600 "$DATA/oncocare.env"
 umask 022
