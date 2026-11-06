@@ -1,6 +1,6 @@
 # Thravi OncoCare
 
-Doctor-side chemotherapy cycle intelligence prototype, built from the supplied PRD and build order.
+Oncology workflow prototype: chemotherapy cycle intelligence, radiation oncology, running and discharge summaries, and a WhatsApp channel for patients.
 The system organises evidence across cycles; it never recommends a treatment action.
 
 ## What works now
@@ -131,6 +131,53 @@ When the patient describes their symptoms by **voice**, the check-in continues a
 
 The spoken questions need a text-to-speech voice for the language on the patient's device. Chrome and Safari usually have Hindi; for Telugu on a Mac, add a voice in System Settings › Accessibility › Spoken Content › System voice › Manage voices. Without one, the questions are shown on screen and the patient can still answer by speaking. Use Chrome, Edge or Safari for speech recognition.
 
+## v0.9: Radiation and surgical oncology, unified plans, running summary, discharge summaries, WhatsApp
+
+### Radiation oncology (from the paper RT case sheet)
+Open a patient → **Radiotherapy courses → + New RT course**. The course workspace has four pages (sidebar):
+
+- **Prescription & plan** (cover sheet + plan sheet): site, site group, laterality, diagnosis, stage, histopathology, intent, machine, consultant, treatment days (e.g. Mon–Sat), baseline weight, concurrent chemotherapy plan and set-up data (head rest, arm position, immobilisation, bladder, bolus, knee rest). One row per **phase** (e.g. 40.5 Gy/15# VMAT 6MV + 10 Gy/5# electron boost) with EQD2 (α/β 10 and 3, no time factor; reference only). IMRT/VMAT **dose constraints** (structure, constraint, achieved, met) and per-phase **isocentre shift / SSD**. The plan must be **approved** by the physicist and radiation oncologist before any fraction can be recorded.
+- **Daily treatment** (RT summary sheet): record each fraction with date, phase (auto-selects the current one), dose, MU and RTT sign. Phase and course **running totals are computed, never typed**. A dose different from the prescription needs a note; extra (gap-compensation) and same-day second fractions must be confirmed. **Missed treatment days** are found from the course's treatment days and listed until a reason is recorded (public holiday, machine downtime, toxicity…). Overall treatment time is compared with the uninterrupted schedule and flagged.
+- **Weekly review** ("Early reactions during radiation therapy"): the sheet's rows (skin, mucous membrane, salivary gland, pharynx & oesophagus, larynx, lower GI, genitourinary, plus general) graded with **CTCAE terms** (dermatitis radiation, mucositis oral, dry mouth, dysphagia, oesophagitis, pharyngeal/laryngeal mucositis, hoarseness, diarrhoea, proctitis, cystitis, urinary frequency, fatigue…). Rows expected for the treated site come first. Weight is recorded with % change and the CTCAE weight-loss grade. Each review ends in a signed **decision**: continue / continue with supportive care / pause / re-plan / stop (reason + rationale required except "continue"). Pause and stop change the course status. Open patient messages appear on this page with **Use in week N review**, which pre-fills suggested grades (not selected until signed).
+- **Completion**: dates, fractions, total dose, overall time, missed days and gap correction, signed. The course can be reopened with a reason.
+
+New CTCAE terms carry the v5.0 text forward (marked as such) until the NCI v6.0 workbook is imported. The patient portal shows radiotherapy in plain language (sessions done, next session, expected last session).
+
+### Surgical oncology
+**+ New plan** on the patient record offers **Medical** (chemotherapy), **Surgical** or **Radiation**; one patient can have any number of each, shown together in date order with a pathway strip. A surgical case has four pages:
+- **Plan & pre-op**: procedure, intent, urgency, site and side, surgeon, admission and surgery dates, ASA grade, comorbidities, a 7-item pre-op checklist (consent, anaesthesia fitness, imaging, tumour board, blood, site marking, fasting) and fasting/special instructions. Open checklist items close to the surgery date are flagged.
+- **Operation note**: date, procedure performed, approach, anaesthesia, duration, team, incision, findings, procedure details, frozen section, specimens, blood loss, transfusion, drains, intra-operative events. It must be signed.
+- **Post-op course**: dated notes by post-operative day (progress, drain, wound, complication, return to theatre, readmission) with pain score and drain output. Complications, returns to theatre and readmissions need a **Clavien–Dindo** grade; the worst grade and length of stay are computed.
+- **Pathology & discharge**: histology, grade, size, margins (closest margin), pT/pN, nodes positive/examined (checked), LVI, PNI, biomarkers; then discharge with condition, drains, wound care, suture removal and follow-up dates.
+Creating or rescheduling a case can send the date, admission and fasting instructions on WhatsApp with a reminder before admission; discharge can send a follow-up reminder. The patient portal shows the operation in plain language (no grades or internal notes).
+
+### Running summary
+Patient record → **Open running summary** (or sidebar **Running summary**). It shows what the patient is on now, worst toxicities, open messages and abnormal labs, and a **timeline** of every source item (chemo cycles and decisions, radiotherapy weeks, missed days and weekly reviews, CTCAE toxicities, lab panels, patient messages from the portal or WhatsApp with their interpretation and outcome, clinical notes, uploaded reports). **Generate summary** writes a short narrative from those sources only: with AI on, Claude writes it; otherwise fixed rules do. **Every sentence cites its sources** (S1, S2…, clickable); sentences without a valid source are highlighted for checking. Clinical notes and uploaded reports (imaging, histopathology, referral…; text extracted, optional AI summary) are added from the same page.
+
+### Discharge / end-of-treatment summary
+**Create discharge summary** → choose type and period (blank = from the first treatment, or the tumour board just before it) → a **draft** is built from the record: treatment given (surgery with histopathology, complications and length of stay; chemo; radiotherapy with phases, interruptions, completion), **activity during this period** (every treatment event, post-op note, review, message, report and clinical note in date order, each with a tick box to leave it out of the printed copy), course during treatment (cited narrative), toxicities, complaints between visits and how they were handled, investigations and reports. The clinician edits the diagnosis and narrative and enters **condition at discharge, medicines, advice and follow-up** (never generated). **Review & finalise** checks required sections and locks the summary; changes need a **new version** (the previous one is marked superseded). **Print / PDF** opens a printable page (citations removed). Finalised summaries appear in the patient portal.
+
+### WhatsApp agent
+Sidebar **WhatsApp**. Default `WHATSAPP_MODE=simulator`: nothing leaves the server; the phone panel lets you type, tap buttons or record a voice note *as the patient*.
+
+**What the doctor does in the chart reaches the patient.** Every action below has a *Send on WhatsApp* tickbox (ticked when the patient has opted in); the doctor's action is the approval:
+- saving a chemotherapy plan → the plan + a reminder for cycle 1;
+- recording a cycle → a new date (delay/hold/stop) updates the plan; after a given cycle, a reminder for the next one (day before, 10:00 IST);
+- approving, pausing or resuming radiotherapy → the updated plan;
+- finalising a discharge summary → the summary (portal link), the prescription and a follow-up reminder;
+- a reply to a patient message → sent back on WhatsApp.
+The WhatsApp page can also send any of these on demand (preview, edit, approve) and a free-text message.
+
+**Patients use the same chat** (text or voice, English/Hindi/Telugu):
+- A menu with three buttons: **Register complaint**, **Symptom check-in** (the fixed CTCAE-based questions with suggested grades for the doctor), **My schedule** (from the record). "Hi", MENU or HELP shows it; STOP/START manage consent.
+- **Agent** (when the Anthropic key is set): Claude reads each message, chooses an action (complaint, check-in for the symptoms it found, a schedule/prescription question answered only from the record, appointment request, greeting) and drafts a short reply in the patient's language. Guard rails in code: red-flag rules run first and send the fixed emergency text; replies with advice phrases ("don't worry", "stop taking", "it is normal"…), doses not in the record, unknown links or excessive length are replaced with a fixed hand-off text; every decision (intent, guard result, note for the doctor) is stored and shown in the chat. Without AI, keyword rules route messages and replies are fixed texts.
+- **Voice**: with `SARVAM_API_KEY`, voice notes are transcribed by Sarvam AI (language auto-detected) and handled like text; when the patient spoke, replies (including the check-in questions) also go out as spoken audio (Sarvam TTS, MP3). Without a key, voice notes are kept for the clinician; the simulator uses the browser's speech recognition and "Listen" instead.
+- Every complaint and check-in lands in **Patient messages** (marked WhatsApp) with AI triage, and the doctor's reply goes back on WhatsApp.
+
+**Live mode**: set `WHATSAPP_MODE=live`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (see `.env.example`), point the Meta webhook to `https://<host>/api/whatsapp/webhook`, and get the five UTILITY templates approved (WhatsApp page → Going live → view). Outside 24 hours from the patient's last message only those templates are used. Menu buttons are sent as WhatsApp reply buttons; spoken replies are uploaded as audio messages.
+
+Clinical dates use the clinic's time zone (`ONCOCARE_TZ`, default Asia/Kolkata), so "today" is correct for India when the server runs in UTC. The demo seed adds **Lakshmi Varma (HN-24102, mobile 9000000102)** on adjuvant breast radiotherapy (19 of 20 fractions, a public-holiday gap, week 4 G2 dermatitis) and a completed pelvic chemoradiation course for Ananya Mehta.
+
 ## Run locally
 
 No installation or build step is needed. Python 3.10+ and SQLite from the standard library are enough.
@@ -158,6 +205,7 @@ python3 -m unittest discover -s tests -v
 | Labs | `GET|POST /api/cycles/{id}/labs` (single or `results[]`), `GET|POST /api/cycles/{id}/lab-documents`, `GET /api/lab-documents/{id}/file`, `GET|PATCH|DELETE /api/labs/{id}`, `POST /api/labs/{id}/verify`, `GET /api/patients/{id}/lab-trends` |
 | Symptoms | `GET|POST /api/patients/{id}/symptoms`, `GET|PATCH|DELETE /api/symptoms/{id}` |
 | Analysis | `GET /api/treatment-plans/{id}/longitudinal` — cycles, windows, lab trends, CTCAE with reasoning, matrix, attention items |
+| Surgery | `GET /api/surgery/options`, `GET|POST /api/patients/{id}/surgeries`, `GET|PATCH|DELETE /api/surgeries/{id}`, `POST /api/surgeries/{id}/operation`, `POST /api/surgeries/{id}/events`, `DELETE /api/surgery-events/{id}`, `POST /api/surgeries/{id}/pathology`, `POST /api/surgeries/{id}/discharge`, `GET /api/portal/surgery` |
 
 ## Code map
 
@@ -165,6 +213,7 @@ python3 -m unittest discover -s tests -v
 - `backend/analysis.py`: deterministic lab grading, baseline trends, per-window CTCAE with reasoning, and the longitudinal build.
 - `backend/extraction.py`: text/PDF text-layer parsing, the optional Claude adapter, and unit normalisation.
 - `backend/api.py`, `backend/database.py`: routes, schema, migrations and synthetic seed data.
+- `backend/surgery.py`, `surgery.js`: surgical cases (plan and pre-op, operation note, post-op course with Clavien–Dindo, histopathology, discharge).
 - `index.html`, `app.js`, `styles.css`: single-page UI with hash routes (`#patients`, `#patient/{id}`, `#plan/{id}/{cycles|review|labs|toxicities|timeline}`).
 
 ## Prototype assumptions and limits

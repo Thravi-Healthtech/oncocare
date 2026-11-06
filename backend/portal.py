@@ -38,6 +38,7 @@ CHECKLIST = {
     "ringing_ears": "Tinnitus", "tiredness": "Fatigue", "fever": "Fever", "appetite": "Anorexia", "rash": "Rash maculo-papular",
     "hair_loss": "Alopecia", "muscle_pain": "Myalgia", "joint_pain": "Arthralgia", "swelling": "Edema limbs",
     "taste": "Dysgeusia", "breathless": "Dyspnea", "hand_foot": "Palmar-plantar erythrodysesthesia syndrome", "bleeding": None, "urine_blood": "Cystitis noninfective", "other": None,
+    "skin_reaction": "Dermatitis radiation", "dry_mouth": "Dry mouth", "swallowing": "Dysphagia",
 }
 IMPACT_TEXT = {
     "none": "Does not limit daily activities",
@@ -46,7 +47,7 @@ IMPACT_TEXT = {
 }
 
 RED_FLAG_RULES = [
-    ("fever", r"\b(fever|feverish|temperature|chills|shivering|rigou?rs?)\b", "Fever or chills during chemotherapy"),
+    ("fever", r"\b(fever|feverish|temperature|chills|shivering|rigou?rs?)\b", "Fever or chills during cancer treatment"),
     ("bleeding", r"\b(bleed(ing)?|blood in (my )?(stool|vomit|urine|sputum)|black (stool|stools|poo)|bruis(e|es|ing) easily|nosebleeds?)\b", "Bleeding or unexplained bruising"),
     ("breathing", r"\b(short(ness)? of breath|breathless|can'?t breathe|cannot breathe|difficulty breathing|trouble breathing|chest pain|chest tightness)\b", "Breathing difficulty or chest pain"),
     ("fluids", r"\b(can'?t|cannot|unable to|not able to) (keep|hold) (anything|food|water|fluids?) down|\b(can'?t|cannot|unable to) (eat|drink)\b|no urine|not pass(ed|ing) urine", "Unable to eat, drink or pass urine"),
@@ -58,12 +59,12 @@ RED_FLAG_RULES = [
 # Common Indian-language words for the red flags above (stems, so inflected forms match). Deliberately broad:
 # a false alarm costs a phone call, a miss can cost much more.
 NATIVE_RED_FLAG_RULES = [
-    ("fever", r"(बुखार|ज्वर|ठंड लग|कंपकंपी|జ్వరం|జ్వర|చలి|காய்ச்சல்|குளிர் நடுக்கம்|ಜ್ವರ|ಚಳಿ|പനി|വിറയൽ|ताप आला|थंडी|জ্বর|কাঁপুনি)", "Fever or chills during chemotherapy"),
+    ("fever", r"(बुखार|ज्वर|ठंड लग|कंपकंपी|జ్వరం|జ్వర|చలి|காய்ச்சல்|குளிர் நடுக்கம்|ಜ್ವರ|ಚಳಿ|പനി|വിറയൽ|ताप आला|थंडी|জ্বর|কাঁপুনি)", "Fever or chills during cancer treatment"),
     ("bleeding", r"(खून|रक्तस्राव|రక్తం|రక్తస్రావం|இரத்த|ரத்த|ರಕ್ತ|രക്ത|रक्त|রক্ত)", "Bleeding or unexplained bruising"),
     ("breathing", r"(सांस|साँस|सीने में दर्द|ఊపిరి|ఆయాసం|ఛాతీ నొప్పి|மூச்சு|நெஞ்சு வலி|ಉಸಿರ|ಎದೆ ನೋವು|ശ്വാസ|നെഞ്ചുവേദന|श्वास|छातीत|শ্বাস|বুকে ব্যথা)", "Breathing difficulty or chest pain"),
     ("neuro", r"(बेहोश|चक्कर आकर गिर|స్పృహ|மயக்க|ಪ್ರಜ್ಞೆ|ബോധം|বেহুঁশ|অজ্ঞান)", "Confusion, fainting or seizure"),
 ]
-EMERGENCY_MESSAGE = ("Some of what you described can be serious during chemotherapy. Please call your care team now, "
+EMERGENCY_MESSAGE = ("Some of what you described can be serious during cancer treatment. Please call your care team now, "
                      "or go to the nearest emergency department. Do not wait for a reply in this portal.")
 
 
@@ -187,6 +188,39 @@ def portal_plans(connection: sqlite3.Connection, patient_id: int) -> list[dict[s
     return plans
 
 
+def portal_radiotherapy(connection: sqlite3.Connection, patient_id: int) -> list[dict[str, Any]]:
+    """Radiotherapy in plain language for the patient: sessions done, next session, expected last day. No grades or notes."""
+    from . import radiotherapy as rt
+    out = []
+    for course in rows(connection, "SELECT id FROM rt_courses WHERE patient_id = ? AND approved_at IS NOT NULL ORDER BY id DESC", (patient_id,)):
+        w = rt.build(connection, course["id"])
+        c, s = w["course"], w["summary"]
+        out.append({"id": c["id"], "site": c["site"], "status": {"planned": "Planned", "active": "In progress", "on_hold": "Paused by your doctor",
+                                                                     "completed": "Completed", "discontinued": "Stopped"}[c["status"]],
+                    "days": c["treatment_days_label"], "sessions_done": s["fractions_delivered"], "sessions_total": s["fractions_planned"],
+                    "next_session": s["next_fraction_date"], "last_session": s["projected_end_date"], "first_session": s["first_fraction_date"],
+                    "parts": [{"name": p["name"].split("·")[-1].strip().capitalize(), "sessions": p["fractions_planned"], "done": p["fractions_delivered"]}
+                              for p in w["phases"]]})
+    return out
+
+
+def portal_surgery(connection: sqlite3.Connection, patient_id: int) -> list[dict[str, Any]]:
+    """Operations in plain language: what, when, admission, preparation, discharge advice. No grades or internal notes."""
+    from . import surgery
+    out = []
+    for row in rows(connection, "SELECT id FROM surgical_cases WHERE patient_id = ? AND status != 'cancelled' ORDER BY COALESCE(surgery_date, created_at) DESC", (patient_id,)):
+        w = surgery.build(connection, row["id"])
+        c = w["case"]
+        op, dis, pre = c["operation"] or {}, c["discharge"] or {}, c["preop"] or {}
+        out.append({"id": c["id"], "procedure": op.get("procedure_performed") or c["procedure_planned"],
+                    "status": {"planned": "Planned", "scheduled": "Scheduled", "completed": "Done — in hospital", "discharged": "Done"}[c["status"]],
+                    "surgery_date": c["surgery_date"], "admission_date": c["admission_date"], "discharge_date": c["discharge_date"],
+                    "fasting_from": pre.get("fasting_from"), "instructions": pre.get("special_instructions"),
+                    "wound_care": dis.get("wound_care"), "suture_removal_date": dis.get("suture_removal_date"), "follow_up_date": dis.get("follow_up_date"),
+                    "discharge_instructions": dis.get("instructions"), "surgeon": c["surgeon"]})
+    return out
+
+
 def portal_labs(connection: sqlite3.Connection, patient_id: int) -> dict[str, Any]:
     labs = rows(connection, """SELECT l.id, l.test_name, l.value, l.unit, l.ref_low, l.ref_high, l.collection_date, l.document_id, c.cycle_number
                                FROM lab_investigations l JOIN treatment_cycles c ON c.id = l.cycle_id
@@ -246,7 +280,7 @@ def detect_red_flags(text: str, symptoms: list[str], temperature: float | None, 
         if match:
             add(code, label, f"Text mentions “{match.group(0)[:60]}”")
     if "fever" in symptoms:
-        add("fever", "Fever or chills during chemotherapy", "Selected fever in the checklist")
+        add("fever", "Fever or chills during cancer treatment", "Selected fever in the checklist")
     if "bleeding" in symptoms:
         add("bleeding", "Bleeding or unexplained bruising", "Selected bleeding in the checklist")
     if "breathless" in symptoms:
@@ -272,6 +306,9 @@ NATIVE_SYMPTOM_KEYWORDS: dict[str, list[str]] = {
     "Hearing impaired": ["कम सुनाई", "వినికిడి తగ్గ", "సరిగా వినపడ", "காது கேட்கவில்லை", "ಕಿವಿ ಕೇಳ", "കേൾവി കുറ", "কম শুনতে"],
     "Myalgia": ["बदन दर्द", "मांसपेशियों में दर्द", "ఒళ్ళు నొప్పులు", "కండరాల నొప్పి", "உடல் வலி", "ಮೈ ಕೈ ನೋವು", "ശരീരവേദന", "গা ব্যথা"],
     "Edema limbs": ["सूजन", "వాపు", "வீக்கம்", "ಊತ", "നീര്", "ফোলা"],
+    "Dermatitis radiation": ["त्वचा जल", "चमड़ी जल", "त्वचा छिल", "చర్మం కాలి", "చర్మం ఎర్ర", "చర్మం పొట్టు", "தோல் எரி", "ಚರ್ಮ ಸುಟ್ಟ", "ത്വക്ക് പൊള്ള", "ত্বক পুড়"],
+    "Dry mouth": ["मुंह सूख", "मुँह सूख", "నోరు ఎండి", "నోరు పొడి", "வாய் வறட்சி", "ಬಾಯಿ ಒಣ", "വായ ഉണങ്ങ", "মুখ শুকি"],
+    "Dysphagia": ["निगलने में", "निगल नहीं", "మింగడం కష్ట", "మింగలేక", "மென்று விழுங்க", "விழுங்க முடிய", "ನುಂಗಲು", "വിഴുങ്ങാൻ", "গিলতে"],
 }
 
 
@@ -645,6 +682,7 @@ def report_view(row: dict[str, Any], for_patient: bool = False) -> dict[str, Any
     view["has_audio"] = bool(row["audio_path"])
     view["impact_text"] = IMPACT_TEXT.get(row["daily_impact"] or "")
     view["patient_message"] = row["patient_message"]
+    view["source"] = row.get("source") or "portal"
     if for_patient:
         view["is_checkin"] = bool(row["checkin_json"])
         view["status_label"] = {"new": "Sent — waiting for review", "reviewed": "Reviewed by your care team",
@@ -680,6 +718,9 @@ def list_reports(connection: sqlite3.Connection, patient_id: int | None = None, 
                 view["recorded"] = []
             view["context"] = patient_context(connection, row["patient_id"], max(row["onset_date"], row["created_at"][:10]), row["id"])
             view["treatment_plan_id"] = row["treatment_plan_id"]
+            rt_course = row_or_none(connection, "SELECT id FROM rt_courses WHERE patient_id = ? AND status IN ('planned', 'active', 'on_hold') ORDER BY id DESC LIMIT 1",
+                                    (row["patient_id"],))
+            view["rt_course_id"] = rt_course["id"] if rt_course else None
             view["patient_name"] = f"{row['first_name']} {row['last_name']}"
             view["medical_record_number"] = row["medical_record_number"]
         out.append(view)

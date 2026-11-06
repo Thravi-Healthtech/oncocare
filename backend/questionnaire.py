@@ -238,6 +238,38 @@ SYMPTOMS: dict[str, dict[str, Any]] = {
                     "questions": [Q_SEV("pain or burning", "दर्द या जलन", "నొప్పి లేదా మంట"),
                                   {"id": "visible_blood", "type": "choice", "options": YES_NO,
                                    "text": T("Can you see blood in the urine?", "क्या पेशाब में खून दिखता है?", "మూత్రంలో రక్తం కనిపిస్తోందా?")}]},
+    # Radiotherapy reactions (treated area). Hindi/Telugu wording needs native-speaker review like the rest of the bank.
+    "skin_reaction": {"term": "Dermatitis radiation", "label": T("Skin reaction where I get radiotherapy", "रेडियोथेरेपी वाली जगह पर त्वचा में बदलाव",
+                                                                 "రేడియేషన్ ఇచ్చే చోట చర్మంలో మార్పు"), "questions": [
+        {"id": "appearance", "type": "choice", "text": T("What does the treated skin look like now?", "इलाज वाली जगह की त्वचा अभी कैसी दिखती है?",
+                                                          "చికిత్స చేసిన చోట చర్మం ఇప్పుడు ఎలా ఉంది?"),
+         "options": [opt("dry", "Pink or red and dry; may itch or flake", "गुलाबी या लाल और सूखी; खुजली या पपड़ी हो सकती है",
+                         "గులాబీ లేదా ఎర్రగా, పొడిగా ఉంది; దురద లేదా పొట్టు రావచ్చు"),
+                     opt("folds", "Very red, or moist/weeping only in skin folds (under the breast, armpit, groin)",
+                         "बहुत लाल, या सिर्फ़ सिलवटों में गीली/रिसती (स्तन के नीचे, बगल, जांघ के पास)",
+                         "బాగా ఎర్రగా, లేదా మడతల్లో మాత్రమే తడిగా/నీరు కారుతూ (రొమ్ము కింద, చంక, గజ్జ)"),
+                     opt("beyond", "Moist, weeping or raw areas outside the folds, or it bleeds when lightly rubbed",
+                         "सिलवटों के बाहर भी गीले, रिसते या छिले हुए हिस्से, या हल्का रगड़ने पर खून आता है",
+                         "మడతల బయట కూడా తడిగా, నీరు కారుతూ లేదా పచ్చిగా ఉంది, లేదా కొద్దిగా రాసినా రక్తం వస్తుంది")]},
+        Q_SEV("pain or burning of the skin", "त्वचा में दर्द या जलन", "చర్మంలో నొప్పి లేదా మంట"),
+    ]},
+    "dry_mouth": {"term": "Dry mouth", "label": T("Dry mouth or thick saliva", "मुंह सूखना या गाढ़ी लार", "నోరు ఎండిపోవడం లేదా చిక్కటి లాలాజలం"), "questions": [
+        {"id": "eating", "type": "choice", "text": T("How does the dry mouth affect your eating?", "मुंह सूखने से आपके खाने पर क्या असर है?",
+                                                      "నోరు ఎండిపోవడం వల్ల మీ తినడంపై ప్రభావం ఎలా ఉంది?"),
+         "options": [opt("normal", "Mouth feels dry, but I eat my usual food", "मुंह सूखा लगता है, पर मैं सामान्य खाना खाता/खाती हूँ",
+                         "నోరు ఎండినట్లు ఉంది, కానీ మామూలు ఆహారం తింటున్నాను"),
+                     opt("soft", "I need to sip water often or eat soft, moist food", "बार-बार पानी पीना पड़ता है या नरम, गीला खाना खाना पड़ता है",
+                         "తరచూ నీళ్లు తాగాలి లేదా మెత్తని, తడి ఆహారం తినాలి"),
+                     opt("cannot", "I cannot eat enough by mouth", "मैं मुंह से पर्याप्त नहीं खा पाता/पाती", "నోటితో తగినంత తినలేకపోతున్నాను")]},
+    ]},
+    "swallowing": {"term": "Dysphagia", "label": T("Pain or difficulty swallowing", "निगलने में दर्द या कठिनाई", "మింగడంలో నొప్పి లేదా ఇబ్బంది"), "questions": [
+        {"id": "diet", "type": "choice", "text": T("What can you swallow?", "आप क्या निगल पा रहे हैं?", "మీరు ఏమి మింగగలుగుతున్నారు?"),
+         "options": [opt("regular", "My usual food, with some discomfort", "थोड़ी तकलीफ़ के साथ अपना सामान्य खाना", "కొంచెం ఇబ్బందితో నా మామూలు ఆహారం"),
+                     opt("soft", "Only soft food or liquids", "सिर्फ़ नरम खाना या तरल", "మెత్తని ఆహారం లేదా ద్రవాలు మాత్రమే"),
+                     opt("little", "I can hardly swallow food or drinks", "मैं खाना या पानी मुश्किल से निगल पाता/पाती हूँ",
+                         "ఆహారం లేదా నీళ్లు మింగడం దాదాపు కుదరడం లేదు")]},
+        Q_SEV("pain on swallowing", "निगलते समय दर्द", "మింగేటప్పుడు నొప్పి"),
+    ]},
 }
 GENERIC_QUESTIONS = [Q_SEV("symptom", "तकलीफ़", "సమస్య"), Q_ADL]
 
@@ -389,7 +421,7 @@ def _grade(key: str, a: dict[str, Any]) -> tuple[int | None, str, list[tuple[str
         return adl_grade, f"Based on daily-activity impact: {ADL_TEXT.get(adl, 'not reported')}", flags
     if key == "fever":
         t = a.get("max_temp")
-        flags.append(("fever", "Fever or chills during chemotherapy"))
+        flags.append(("fever", "Fever or chills during cancer treatment"))
         if t is None:
             return None, "Temperature not measured; grade needs a measured temperature", flags
         if t > 40:
@@ -447,6 +479,22 @@ def _grade(key: str, a: dict[str, Any]) -> tuple[int | None, str, list[tuple[str
         if a.get("visible_blood") == "yes":
             return 2, "Visible blood in urine (G2 cystitis: moderate hematuria)", flags
         return (sev and min(sev, 3)), "Based on severity of urinary symptoms", flags
+    if key == "skin_reaction":
+        g = {"dry": 1, "folds": 2, "beyond": 3}.get(a.get("appearance"))
+        return g, {1: "Faint erythema or dry desquamation (G1)", 2: "Brisk erythema or moist desquamation confined to skin folds (G2)",
+                   3: "Moist desquamation beyond skin folds or bleeding with minor trauma (G3)"}.get(g, "Skin appearance not reported"), flags
+    if key == "dry_mouth":
+        if a.get("eating") == "cannot":
+            flags.append(("fluids", "Cannot eat enough by mouth"))
+        g = {"normal": 1, "soft": 2, "cannot": 3}.get(a.get("eating"))
+        return g, {1: "Symptomatic without significant dietary change (G1)", 2: "Oral intake alterations, e.g. copious water or soft moist diet (G2)",
+                   3: "Unable to eat adequately by mouth (G3)"}.get(g, "Effect on eating not reported"), flags
+    if key == "swallowing":
+        if a.get("diet") == "little":
+            flags.append(("fluids", "Can hardly swallow food or drinks"))
+        g = {"regular": 1, "soft": 2, "little": 3}.get(a.get("diet"))
+        return g, {1: "Symptomatic, able to eat regular diet (G1)", 2: "Altered eating/swallowing (G2)",
+                   3: "Severely altered eating/swallowing (G3)"}.get(g, "Swallowing not reported"), flags
     # pain-type and generic symptoms: severity + ADL
     grades = [g for g in (adl_grade, sev) if g]
     if not grades:

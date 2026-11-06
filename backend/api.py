@@ -18,11 +18,14 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from .analysis import analyse_plan, decision_evidence, grade_lab
+from .errors import ApiError
 from .database import CLINICIAN, normalise_phone, record_cycle_revision, row_or_none, rows, sync_cycle_summary, transaction, utc_now
 from .extraction import ai_status, extract_candidates, save_ai_settings
 from . import auth, portal
 from .portal import PortalError
+from . import radiotherapy, surgery, whatsapp
 from . import questionnaire, voice_answers
+from . import routes_ext
 from http.cookies import SimpleCookie
 
 PORTAL_COOKIE = "oncocare_portal"
@@ -41,12 +44,6 @@ REASON_CATEGORIES = {"Toxicity", "Laboratory findings", "Clinical status", "Pati
 PENDING = {"planned", "delayed"}
 
 
-class ApiError(Exception):
-    def __init__(self, status: int, message: str, details: dict[str, Any] | None = None):
-        super().__init__(message)
-        self.status = status
-        self.message = message
-        self.details = details or {}
 
 
 def require(payload: dict[str, Any], fields: list[str]) -> None:
@@ -174,6 +171,7 @@ def demo_banner_html() -> bytes:
 def make_handler(db_path: str | Path, static_dir: str | Path | None = None, require_auth: bool = True) -> type[BaseHTTPRequestHandler]:
     database_path = str(db_path)
     upload_dir = Path(database_path).resolve().parent / "uploads" if database_path != ":memory:" else Path("uploads")
+    whatsapp.MEDIA_DIR = upload_dir / "whatsapp"
     web_root = Path(static_dir).resolve() if static_dir else None
 
     class Handler(BaseHTTPRequestHandler):
@@ -209,6 +207,8 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             self._extra_headers = []
             self.clinician = None
             try:
+                if parsed.path == "/api/whatsapp/webhook":
+                    return self._whatsapp_webhook(method, parsed)
                 if parsed.path.startswith("/api/auth/"):
                     result, status = self._auth_route(method, parsed.path)
                     return self._json(status, result)
@@ -221,12 +221,17 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                 if file_match and method == "GET":
                     return self._serve_document(int(file_match.group(1)))
                 binary = self._binary_route(method, parsed.path)
+                if isinstance(binary, routes_ext.RawResponse):
+                    return self._send_raw(binary)
                 if binary:
                     return self._send_file(*binary)
                 if parsed.path.startswith("/api/portal/"):
                     result, status = self._portal_route(method, parsed.path)
                 else:
-                    result, status = self._route(method, parsed.path, parse_qs(parsed.query))
+                    routed = self._route(method, parsed.path, parse_qs(parsed.query))
+                    if isinstance(routed, routes_ext.RawResponse):
+                        return self._send_raw(routed)
+                    result, status = routed
                 self._json(status, result)
             except auth.AuthError as error:
                 self._json(error.status, {"error": {"message": error.message, "details": {}}})
@@ -275,6 +280,9 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                                      (_reference.DRUG_TOXICITIES.get(_reference.normalise_drug(d) or "", {}).get("terms", []))} for d in names}}, HTTPStatus.OK
             if method == "GET" and path == "/api/ctcae/suggest":
                 return self._suggest_terms(query), HTTPStatus.OK
+            extended = routes_ext.dispatch(routes_ext.Ctx(database_path, self._body, self._clinician_name(), upload_dir, query), method, path)
+            if extended is not None:
+                return extended
             routes: list[tuple[str, dict[str, Any]]] = [
                 (r"/api/patients", {"GET": lambda: self._list_patients(query), "POST": lambda: (self._create_patient(), 201)}),
                 (r"/api/patients/(\d+)", {"GET": self._get_patient, "PATCH": self._update_patient, "DELETE": lambda i: self._delete("patients", i)}),
@@ -343,7 +351,17 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                      WHERE tp.patient_id = p.id AND tp.status = 'active' AND c.status IN ('planned','delayed') ORDER BY c.planned_date LIMIT 1) AS next_cycle_date,
                   (SELECT c.cycle_number FROM treatment_cycles c JOIN treatment_plans tp ON tp.id = c.treatment_plan_id
                      WHERE tp.patient_id = p.id AND tp.status = 'active' AND c.status IN ('planned','delayed') ORDER BY c.planned_date LIMIT 1) AS next_cycle_number,
-                  (SELECT MAX(s.grade) FROM symptoms s WHERE s.patient_id = p.id AND s.status != 'resolved') AS open_toxicity_grade,
+                  MAX(COALESCE((SELECT MAX(s.grade) FROM symptoms s WHERE s.patient_id = p.id AND s.status != 'resolved'), 0),
+                      COALESCE((SELECT MAX(i.grade) FROM rt_review_items i WHERE i.review_id = (
+                          SELECT r.id FROM rt_reviews r JOIN rt_courses rc ON rc.id = r.course_id
+                          WHERE rc.patient_id = p.id AND rc.status IN ('active', 'on_hold') ORDER BY r.review_date DESC, r.id DESC LIMIT 1)), 0)) AS open_toxicity_grade,
+                  (SELECT rc.site FROM rt_courses rc WHERE rc.patient_id = p.id AND rc.status IN ('planned', 'active', 'on_hold') ORDER BY rc.id DESC LIMIT 1) AS active_rt_site,
+                  (SELECT sc.procedure_planned FROM surgical_cases sc WHERE sc.patient_id = p.id AND sc.status IN ('planned', 'scheduled', 'completed') ORDER BY sc.id DESC LIMIT 1) AS active_surgery,
+                  (SELECT sc.surgery_date FROM surgical_cases sc WHERE sc.patient_id = p.id AND sc.status IN ('planned', 'scheduled') ORDER BY sc.surgery_date LIMIT 1) AS next_surgery_date,
+                  (SELECT sc.status FROM surgical_cases sc WHERE sc.patient_id = p.id AND sc.status IN ('planned', 'scheduled', 'completed') ORDER BY sc.id DESC LIMIT 1) AS active_surgery_status,
+                  (SELECT rc.id FROM rt_courses rc WHERE rc.patient_id = p.id AND rc.status IN ('planned', 'active', 'on_hold') ORDER BY rc.id DESC LIMIT 1) AS active_rt_id,
+                  (SELECT COUNT(*) FROM rt_fractions f JOIN rt_courses rc ON rc.id = f.course_id WHERE rc.patient_id = p.id AND rc.status IN ('planned', 'active', 'on_hold')) AS active_rt_fractions,
+                  (SELECT SUM(ph.fractions_planned) FROM rt_phases ph JOIN rt_courses rc ON rc.id = ph.course_id WHERE rc.patient_id = p.id AND rc.status IN ('planned', 'active', 'on_hold')) AS active_rt_planned,
                   (SELECT COUNT(*) FROM patient_reports r WHERE r.patient_id = p.id AND r.status = 'new') AS open_reports,
                   (SELECT COUNT(*) FROM patient_reports r WHERE r.patient_id = p.id AND r.status = 'new' AND r.red_flags_json NOT IN ('[]', '')) AS urgent_reports
                 FROM patients p {('WHERE ' + ' AND '.join(where)) if where else ''}
@@ -394,6 +412,8 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                 if not patient:
                     raise ApiError(HTTPStatus.NOT_FOUND, "Patient not found")
                 patient["treatment_plans"] = self._plans_with_summary(connection, patient_id)
+                patient["rt_courses"] = radiotherapy.list_for_patient(connection, patient_id)
+                patient["surgeries"] = surgery.list_for_patient(connection, patient_id)
             return {"data": patient}
 
         def _plans_with_summary(self, connection: sqlite3.Connection, patient_id: int) -> list[dict[str, Any]]:
@@ -479,6 +499,12 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                     self._insert_cycle(connection, plan_id, number, planned_date, meds, now)
                 plan = row_or_none(connection, "SELECT * FROM treatment_plans WHERE id = ?", (plan_id,))
                 plan["medications"] = rows(connection, "SELECT * FROM plan_medications WHERE treatment_plan_id = ? ORDER BY sort_order", (plan_id,))
+            if payload.get("notify_whatsapp"):
+                plan["whatsapp"] = [whatsapp.notify(database_path, patient_id, "plan", self._clinician_name())]
+                first = validated_cycles[0] if validated_cycles else None
+                if first and first[1] > date.today().isoformat():
+                    plan["whatsapp"].append(whatsapp.notify(database_path, patient_id, "reminder", self._clinician_name(), visit_date=first[1],
+                                                            visit_time="09:00", purpose=f"{clean_text(payload['regimen_name'])}, cycle {first[0]}"))
             return {"data": plan}
 
         def _insert_cycle(self, connection: sqlite3.Connection, plan_id: int, number: int, planned_date: str,
@@ -728,6 +754,17 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                     (cycle_id, outcome, category, rationale, decision_evidence(analysis, cycle_id), recorded_by, now))
                 updated = self._cycle_with_meds(connection, cycle_id)
                 updated["decisions"] = self._decisions(connection, cycle_id)
+                next_cycle = row_or_none(connection, """SELECT cycle_number, planned_date FROM treatment_cycles WHERE treatment_plan_id = ?
+                                                        AND status IN ('planned', 'delayed') ORDER BY planned_date LIMIT 1""", (cycle["treatment_plan_id"],))
+            if payload.get("notify_whatsapp"):
+                # The doctor's decision reaches the patient: a new date updates the plan; after a given cycle, a reminder for the next one.
+                sent = []
+                if outcome in ("delayed", "held", "discontinued"):
+                    sent.append(whatsapp.notify(database_path, plan["patient_id"], "plan", self._clinician_name()))
+                if outcome in ("given", "modified", "delayed") and next_cycle and next_cycle["planned_date"] > date.today().isoformat():
+                    sent.append(whatsapp.notify(database_path, plan["patient_id"], "reminder", self._clinician_name(), visit_date=next_cycle["planned_date"],
+                                                visit_time="09:00", purpose=f"Chemotherapy cycle {next_cycle['cycle_number']}"))
+                updated["whatsapp"] = sent
             return {"data": updated, "meta": {"previous_version_preserved": True}}
 
         def _decisions(self, connection: sqlite3.Connection, cycle_id: int) -> list[dict[str, Any]]:
@@ -1129,8 +1166,13 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
 
         def _review_patient_report(self, report_id: int) -> dict[str, Any]:
             payload = self._body()
+            payload.setdefault("reviewed_by", self._clinician_name())
             with transaction(database_path) as connection:
-                return {"data": portal.review_report(connection, report_id, payload)}
+                before = row_or_none(connection, "SELECT patient_message FROM patient_reports WHERE id = ?", (report_id,))
+                result = portal.review_report(connection, report_id, payload)
+            if before is not None and result.get("patient_message") and result["patient_message"] != before["patient_message"]:
+                result["whatsapp"] = whatsapp.send_report_reply(database_path, report_id, self._clinician_name(), upload_dir)
+            return {"data": result}
 
         # ------------------------------------------------------------------ patient portal (patient side)
         def _cookie(self, name: str) -> str | None:
@@ -1194,6 +1236,15 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             if path == "/api/portal/plans" and method == "GET":
                 with transaction(database_path) as connection:
                     return {"data": portal.portal_plans(connection, patient_id)}, HTTPStatus.OK
+            if path == "/api/portal/radiotherapy" and method == "GET":
+                with transaction(database_path) as connection:
+                    return {"data": portal.portal_radiotherapy(connection, patient_id)}, HTTPStatus.OK
+            if path == "/api/portal/surgery" and method == "GET":
+                with transaction(database_path) as connection:
+                    return {"data": portal.portal_surgery(connection, patient_id)}, HTTPStatus.OK
+            if path == "/api/portal/summaries" and method == "GET":
+                from . import discharge
+                return {"data": discharge.for_patient(database_path, patient_id)}, HTTPStatus.OK
             if path == "/api/portal/labs" and method == "GET":
                 with transaction(database_path) as connection:
                     return {"data": portal.portal_labs(connection, patient_id)}, HTTPStatus.OK
@@ -1236,6 +1287,12 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                 with transaction(database_path) as connection:
                     file_path, content_type = portal.audio_for(connection, int(match.group(1)), patient_id)
                 return file_path, content_type, None
+            match = re.fullmatch(r"/api/portal/summaries/(\d+)/print", path)
+            if match:
+                from . import discharge
+                patient_id = self._portal_patient()
+                html_page = discharge.print_html(database_path, int(match.group(1)), patient_id=patient_id)
+                return routes_ext.RawResponse(html_page.encode(), "text/html; charset=utf-8")
             match = re.fullmatch(r"/api/portal/documents/(\d+)/file", path)
             if match:
                 patient_id = self._portal_patient()
@@ -1243,6 +1300,39 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                     doc = portal.patient_document(connection, patient_id, int(match.group(1)))
                 return Path(doc["stored_path"]), doc["content_type"] or "application/octet-stream", doc["filename"]
             return None
+
+        def _send_raw(self, raw: "routes_ext.RawResponse") -> None:
+            if raw.content_type.startswith("file:"):
+                return self._send_file(Path(raw.content.decode()), raw.content_type[5:], raw.filename)
+            self.send_response(200)
+            self.send_header("Content-Type", raw.content_type)
+            self.send_header("Content-Length", str(len(raw.content)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            if raw.filename:
+                self.send_header("Content-Disposition", f'inline; filename="{raw.filename}"')
+            self.end_headers()
+            self.wfile.write(raw.content)
+
+        def _whatsapp_webhook(self, method: str, parsed: Any) -> None:
+            """Meta WhatsApp Cloud API webhook: GET verification handshake and POST message/status events."""
+            if method == "GET":
+                status, text = whatsapp.verify_webhook(parse_qs(parsed.query))
+                body = text.encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if method != "POST":
+                return self._json(405, {"error": {"message": "Method not allowed"}})
+            length = int(self.headers.get("Content-Length", "0"))
+            if length > MAX_UPLOAD_JSON:
+                return self._json(413, {"error": {"message": "Payload too large"}})
+            raw = self.rfile.read(length) if length else b""
+            status, result = whatsapp.handle_webhook(database_path, raw, self.headers.get("X-Hub-Signature-256"), upload_dir)
+            return self._json(status, result)
 
         def _send_file(self, file_path: Path, content_type: str, filename: str | None) -> None:
             resolved = file_path.resolve()
@@ -1328,7 +1418,8 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                 return self._json(404, {"error": {"message": "Not found"}})
             pages = {"": "home.html", "/": "home.html", "/clinician": "index.html", "/clinician/": "index.html", "/portal": "portal.html", "/portal/": "portal.html"}
             relative = pages.get(request_path, request_path.lstrip("/"))
-            if relative not in {"home.html", "home.css", "index.html", "app.js", "styles.css", "favicon.ico", "portal.html", "portal.js", "portal.css"}:
+            if relative not in {"home.html", "home.css", "index.html", "app.js", "styles.css", "favicon.ico", "portal.html", "portal.js", "portal.css",
+                                "rt.js", "surgery.js", "records.js", "whatsapp.js"}:
                 return self._json(404, {"error": {"message": "Not found"}})
             target = (web_root / relative).resolve()
             if web_root not in target.parents and target != web_root:

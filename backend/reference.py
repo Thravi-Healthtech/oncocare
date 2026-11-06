@@ -153,6 +153,60 @@ CTCAE_TERMS: dict[str, dict] = {
         3: "Shortness of breath at rest; limiting self care ADL",
         4: "Life-threatening consequences; urgent intervention indicated",
         5: "Death"}},
+    # Radiotherapy-related terms (weekly on-treatment review). CTCAE v5.0 text carried forward.
+    "Dermatitis radiation": {"category": "Injury, poisoning and procedural complications", "kind": "clinical", "grades": {
+        1: "Faint erythema or dry desquamation",
+        2: "Moderate to brisk erythema; patchy moist desquamation, mostly confined to skin folds and creases; moderate edema",
+        3: "Moist desquamation in areas other than skin folds and creases; bleeding induced by minor trauma or abrasion",
+        4: "Life-threatening consequences; skin necrosis or ulceration of full thickness dermis; spontaneous bleeding from involved site; skin graft indicated",
+        5: "Death"}},
+    "Dry mouth": {"category": "Gastrointestinal disorders", "kind": "clinical", "grades": {
+        1: "Symptomatic (e.g., dry or thick saliva) without significant dietary alteration; unstimulated saliva flow >0.2 ml/min",
+        2: "Moderate symptoms; oral intake alterations (e.g., copious water, other lubricants, diet limited to purees and/or soft, moist foods); unstimulated saliva 0.1 to 0.2 ml/min",
+        3: "Inability to adequately aliment orally; tube feeding or TPN indicated; unstimulated saliva <0.1 ml/min"}},
+    "Dysphagia": {"category": "Gastrointestinal disorders", "kind": "clinical", "grades": {
+        1: "Symptomatic, able to eat regular diet",
+        2: "Symptomatic and altered eating/swallowing",
+        3: "Severely altered eating/swallowing; tube feeding, TPN, or hospitalization indicated",
+        4: "Life-threatening consequences; urgent intervention indicated",
+        5: "Death"}},
+    "Esophagitis": {"category": "Gastrointestinal disorders", "kind": "clinical", "grades": {
+        1: "Asymptomatic; clinical or diagnostic observations only; intervention not indicated",
+        2: "Symptomatic; altered eating/swallowing; oral supplements indicated",
+        3: "Severely altered eating/swallowing; tube feeding, TPN or hospitalization indicated",
+        4: "Life-threatening consequences; urgent operative intervention indicated",
+        5: "Death"}},
+    "Pharyngeal mucositis": {"category": "Respiratory disorders", "kind": "clinical", "grades": {
+        1: "Endoscopic findings only; minimal symptoms with normal oral intake; mild pain but analgesics not indicated",
+        2: "Moderate pain and analgesics indicated; altered oral intake; limiting instrumental ADL",
+        3: "Severe pain; unable to adequately aliment or hydrate orally; limiting self care ADL",
+        4: "Life-threatening consequences; urgent intervention indicated",
+        5: "Death"}},
+    "Laryngeal mucositis": {"category": "Respiratory disorders", "kind": "clinical", "grades": {
+        1: "Endoscopic findings only; mild discomfort with normal intake",
+        2: "Moderate discomfort; altered oral intake",
+        3: "Severe pain; severely altered eating/swallowing; medical intervention indicated",
+        4: "Life-threatening airway compromise; urgent intervention indicated (e.g., tracheotomy or intubation)",
+        5: "Death"}},
+    "Hoarseness": {"category": "Respiratory disorders", "kind": "clinical", "grades": {
+        1: "Mild or intermittent voice change; fully understandable; self-resolves",
+        2: "Moderate or persistent voice changes; may require occasional repetition but understandable on telephone; medical evaluation indicated",
+        3: "Severe voice changes including predominantly whispered speech"}},
+    "Proctitis": {"category": "Gastrointestinal disorders", "kind": "clinical", "grades": {
+        1: "Rectal discomfort, intervention not indicated",
+        2: "Symptoms (e.g., rectal discomfort, passing blood or mucus); medical intervention indicated; limiting instrumental ADL",
+        3: "Severe symptoms; fecal urgency or stool incontinence; limiting self care ADL",
+        4: "Life-threatening consequences; urgent intervention indicated",
+        5: "Death"}},
+    "Urinary frequency": {"category": "Renal and urinary disorders", "kind": "clinical", "grades": {
+        1: "Present",
+        2: "Limiting instrumental ADL; medical management indicated"}},
+    "Breast pain": {"category": "Reproductive system and breast disorders", "kind": "clinical", "grades": {
+        1: "Mild pain", 2: "Moderate pain; limiting instrumental ADL", 3: "Severe pain; limiting self care ADL"}},
+    "Weight loss": {"category": "Investigations", "kind": "clinical", "grades": {
+        1: "5 to <10% from baseline; intervention not indicated",
+        2: "10 - <20% from baseline; nutritional support indicated",
+        3: ">=20% from baseline; tube feeding or TPN indicated"}},
     # Lab-derived terms
     "Neutrophil count decreased": {"category": "Investigations", "kind": "lab", "lab": "ANC", "grades": {
         1: "<LLN - 1500/mm3; <LLN - 1.5 x 10e9 /L", 2: "<1500 - 1000/mm3; <1.5 - 1.0 x 10e9 /L",
@@ -348,6 +402,16 @@ SYMPTOM_KEYWORDS: dict[str, list[str]] = {
     "Pneumonitis": ["dry cough"],
     "Dyspnea": ["breathless", "shortness of breath", "short of breath", "breathlessness"],
     "Acute kidney injury": ["reduced urine", "kidney injury"],
+    "Dermatitis radiation": ["skin burn", "burning skin", "skin is burning", "skin peeling", "peeling skin", "skin is peeling", "red skin", "skin is red", "skin redness", "radiation burn", "skin darkening", "itchy skin", "skin is raw", "weeping skin", "blistered skin"],
+    "Dry mouth": ["dry mouth", "thick saliva", "no saliva", "xerostomia"],
+    "Dysphagia": ["difficulty swallowing", "trouble swallowing", "hard to swallow", "painful swallowing", "pain on swallowing", "food sticking"],
+    "Esophagitis": ["heartburn", "chest burning when swallowing", "esophagitis", "oesophagitis"],
+    "Pharyngeal mucositis": ["sore throat", "throat pain", "throat ulcer"],
+    "Hoarseness": ["hoarse", "hoarseness", "voice change", "lost my voice", "husky voice"],
+    "Proctitis": ["rectal pain", "pain in back passage", "blood from back passage", "mucus in stool", "proctitis"],
+    "Urinary frequency": ["frequent urination", "passing urine often", "urinating often", "urgency"],
+    "Breast pain": ["breast pain", "pain in breast", "breast tenderness"],
+    "Weight loss": ["weight loss", "losing weight", "lost weight"],
 }
 
 
