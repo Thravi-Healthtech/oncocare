@@ -251,8 +251,8 @@ def collect(connection: sqlite3.Connection, patient_id: int, period_from: str | 
     def within(day: str | None) -> bool:
         return bool(day) and (not period_from or day >= period_from) and (not period_to or day <= period_to)
 
-    def add(day: str, kind: str, title: str, detail: str, ref: dict[str, Any], severity: str | None = None) -> None:
-        if within(day):
+    def add(day: str, kind: str, title: str, detail: str, ref: dict[str, Any], severity: str | None = None, always: bool = False) -> None:
+        if within(day) or (always and day):
             items.append({"date": day, "kind": kind, "title": title, "detail": detail, "ref": ref, "severity": severity})
 
     # Chemotherapy
@@ -459,11 +459,12 @@ def collect(connection: sqlite3.Connection, patient_id: int, period_from: str | 
     from . import oncology  # local import: oncology uses records helpers
     onco = oncology.overview_for(connection, patient_id, period_to)
     for d in onco["diagnoses"]:
+        # The diagnosis and the baseline scan are usually outside a summary's period, but the summary reports them and must cite them.
         add(d["diagnosis_date"], "staging", f"Diagnosis: {d['primary_site']}" + (f" — {d['stage_text']}" if d["stage_text"] else ""), d["summary"],
-            {"type": "diagnosis", "id": d["id"]})
+            {"type": "diagnosis", "id": d["id"]}, always=True)
     for a in onco["assessments"]:
         add(a["assessment_date"], "response", f"Tumour assessment ({a['timepoint_label'].lower()})", oncology.assessment_line(a),
-            {"type": "tumour_assessment", "id": a["id"]}, "warn" if a["response"] == "PD" else None)
+            {"type": "tumour_assessment", "id": a["id"]}, "warn" if a["response"] == "PD" else None, always=a["timepoint"] == "baseline")
 
     rank = {"staging": 0, "response": 1, "note": 0, "document": 1, "labs": 2, "surgery": 3, "surgery_note": 3, "chemo": 4, "rt": 5, "rt_review": 6, "toxicity": 7, "complaint": 8, "discharge": 9}
     items.sort(key=lambda i: (i["date"], rank.get(i["kind"], 99)))  # stable: surgery events keep their recorded order
@@ -515,6 +516,13 @@ def _cite(ids: list[str], limit: int = 4) -> str:
         return ""
     shown = ids if len(ids) <= limit else ids[:2] + ids[-2:]
     return " " + "".join(f"[{i}]" for i in shown)
+
+
+def _first_sentence(text: str, limit: int) -> str:
+    """First sentence of a (possibly multi-sentence AI) summary, cut at a word: a quoted second sentence would be split off
+    by check_citations as an uncited sentence, and a hard cut left half a word."""
+    first = re.split(r"(?<=[.!?])\s+", (text or "").strip(), maxsplit=1)[0].rstrip(".")
+    return first if len(first) <= limit else first[:limit].rsplit(" ", 1)[0] + "…"
 
 
 def rules_narrative(facts: dict[str, Any]) -> str:
@@ -591,7 +599,7 @@ def rules_narrative(facts: dict[str, Any]) -> str:
         urgent = [c for c in facts["complaints"] if c["red_flags"]]
         sentences.append(f"The patient sent {len(facts['complaints'])} message(s) between visits"
                          + (f", {len(urgent)} with red flags" if urgent else "") + "; latest on " + facts["complaints"][-1]["date"] + ": "
-                         + facts["complaints"][-1]["summary"].rstrip(".")[:220] + f" ({facts['complaints'][-1]['outcome']})."
+                         + _first_sentence(facts["complaints"][-1]["summary"], 220) + f" ({facts['complaints'][-1]['outcome']})."
                          + _cite([i["id"] for i in items if i["kind"] == "complaint"]))
     abnormal = [l for l in facts["labs"] if l["flag"]]
     if abnormal:

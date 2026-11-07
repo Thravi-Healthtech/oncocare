@@ -316,6 +316,8 @@ def _anthropic_post(api_key: str, body: dict[str, Any], timeout: float) -> dict[
         raise RuntimeError(f"Claude API HTTP {error.code}: {detail or error.reason}") from None
     except urllib.error.URLError as error:
         raise RuntimeError(f"Cannot reach api.anthropic.com ({error.reason})") from None
+    except OSError as error:  # a timeout waiting for the reply is not wrapped in URLError
+        raise RuntimeError(f"No reply from api.anthropic.com ({error or type(error).__name__})") from None
 
 
 def test_ai(api_key: str, model: str) -> dict[str, Any]:

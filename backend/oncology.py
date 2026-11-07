@@ -219,16 +219,17 @@ def recist(assessments: list[dict[str, Any]]) -> list[dict[str, Any]]:
             result["computed_reason"] = "Baseline" if total is not None else "No target lesion measured"
             out.append(a | result)
             continue
+        nt_progression = any(l["status"] == "progression" for l in non_targets)
         if total is None:
-            result["computed"] = "NE"
-            result["computed_reason"] = "Target lesions not measured"
+            # A new lesion or unequivocal non-target progression is PD even when the targets were not re-measured.
+            result["computed"] = "PD" if new or nt_progression else "NE"
+            result["computed_reason"] = "New lesion" if new else "Non-target progression" if nt_progression else "Target lesions not measured"
             out.append(a | result)
             continue
         from_base = (total - baseline_sum) / baseline_sum * 100 if baseline_sum else None
         from_nadir = (total - nadir) / nadir * 100 if nadir else (100.0 if total > 0 else 0.0)
         result["change_from_baseline_pct"] = round(from_base, 1) if from_base is not None else None
         result["change_from_nadir_pct"] = round(from_nadir, 1)
-        nt_progression = any(l["status"] == "progression" for l in non_targets)
         nt_present = any(l["status"] == "present" for l in non_targets)
         all_gone = all((l["size_mm"] or 0) < 10 if l["node"] else (l["size_mm"] or 0) == 0 for l in targets)
         if new or nt_progression or (from_nadir >= 20 and total - nadir >= 5):

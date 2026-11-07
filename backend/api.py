@@ -754,8 +754,13 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                     (cycle_id, outcome, category, rationale, decision_evidence(analysis, cycle_id), recorded_by, now))
                 updated = self._cycle_with_meds(connection, cycle_id)
                 updated["decisions"] = self._decisions(connection, cycle_id)
-                next_cycle = row_or_none(connection, """SELECT cycle_number, planned_date FROM treatment_cycles WHERE treatment_plan_id = ?
+                next_cycle = row_or_none(connection, """SELECT id, cycle_number, planned_date FROM treatment_cycles WHERE treatment_plan_id = ?
                                                         AND status IN ('planned', 'delayed') ORDER BY planned_date LIMIT 1""", (cycle["treatment_plan_id"],))
+                # A reminder already scheduled for this cycle (or, when the dates moved or the plan stopped, the later ones) is now wrong.
+                stale = [cycle_id] + ([r["id"] for r in rows(connection, "SELECT id FROM treatment_cycles WHERE treatment_plan_id = ? AND cycle_number > ?",
+                                                             (cycle["treatment_plan_id"], cycle["cycle_number"]))]
+                                      if outcome == "discontinued" or (outcome == "delayed" and payload.get("shift_following")) else [])
+            whatsapp.cancel_reminders(database_path, plan["patient_id"], [f"chemo-cycle:{i}" for i in stale])
             if payload.get("notify_whatsapp"):
                 # The doctor's decision reaches the patient: a new date updates the plan; after a given cycle, a reminder for the next one.
                 sent = []
@@ -763,7 +768,8 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                     sent.append(whatsapp.notify(database_path, plan["patient_id"], "plan", self._clinician_name()))
                 if outcome in ("given", "modified", "delayed") and next_cycle and next_cycle["planned_date"] > date.today().isoformat():
                     sent.append(whatsapp.notify(database_path, plan["patient_id"], "reminder", self._clinician_name(), visit_date=next_cycle["planned_date"],
-                                                visit_time="09:00", purpose=f"Chemotherapy cycle {next_cycle['cycle_number']}"))
+                                                visit_time="09:00", purpose=f"Chemotherapy cycle {next_cycle['cycle_number']}",
+                                                reminder_key=f"chemo-cycle:{next_cycle['id']}"))
                 updated["whatsapp"] = sent
             return {"data": updated, "meta": {"previous_version_preserved": True}}
 

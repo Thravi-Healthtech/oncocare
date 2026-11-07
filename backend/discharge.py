@@ -269,6 +269,9 @@ def revise(db: str, summary_id: int, actor: str) -> dict[str, Any]:
         row = _load(connection, summary_id)
         if row["status"] != "final":
             raise ApiError(409, "Only a finalised summary can be revised")
+        pending = row_or_none(connection, "SELECT id FROM discharge_summaries WHERE parent_id = ? AND status = 'draft' ORDER BY id DESC LIMIT 1", (summary_id,))
+        if pending:  # a new version is already being drafted: open it rather than start a second one with the same number
+            return _view(_load(connection, pending["id"]))
         now = utc_now()
         new_id = connection.execute(
             """INSERT INTO discharge_summaries (patient_id, kind, status, version, parent_id, period_from, period_to, content_json, sources_json,
