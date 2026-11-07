@@ -37,7 +37,10 @@ SESSION_IDLE_MINUTES = 120
 SYNC_TRIAGE = False  # tests set True so report triage runs inline
 LANGS = ("en", "hi", "te")
 OUT_KINDS = {"plan": "Treatment plan", "prescription": "Prescription", "discharge": "Discharge summary", "reminder": "Visit reminder",
-             "message": "Message from doctor", "reply": "Reply to patient message"}
+             "document": "Document", "message": "Message from doctor", "reply": "Reply to patient message"}
+VISIT_YES, VISIT_NO = "visit_yes", "visit_no"  # reminder button ids: "<kind>:<reminder message id>"
+CONFIRM_WORDS = {"confirm", "confirmed", "confirm visit", "पुष्टि", "నిర్ధారించు"}
+RESCHEDULE_WORDS = {"reschedule", "change date", "नई तारीख", "తేదీ మార్చండి"}
 
 # ---------------------------------------------------------------------------------------------- configuration
 def _env(key: str, default: str = "") -> str:
@@ -149,6 +152,16 @@ TEXT: dict[str, dict[str, str]] = {
                  "te": "నాకు అర్థమైంది: {symptoms}. డాక్టర్ అంచనా కోసం కొన్ని చిన్న ప్రశ్నలు అడుగుతాను."},
     "answer_hint": {"en": "Reply with the number, or say it in your own words.", "hi": "नंबर भेजें, या अपने शब्दों में बताइए।",
                     "te": "సంఖ్యను పంపండి, లేదా మీ మాటల్లో చెప్పండి."},
+    "visit_confirmed": {"en": "Thank you. Your visit at {clinic} on {when} is booked. Please bring your reports and medicines. If anything changes, reply here.",
+                        "hi": "धन्यवाद। {clinic} में {when} को आपकी विज़िट बुक हो गई है। कृपया अपनी रिपोर्ट और दवाइयाँ साथ लाएँ। कुछ बदले तो यहाँ जवाब दें।",
+                        "te": "ధన్యవాదాలు. {clinic} లో {when} న మీ సందర్శన బుక్ అయింది. దయచేసి మీ రిపోర్టులు, మందులు తీసుకురండి. ఏదైనా మారితే ఇక్కడ జవాబు ఇవ్వండి."},
+    "visit_reschedule": {"en": "No problem. Please reply with a day and time that suits you, and the care team at {clinic} will confirm a new visit.",
+                         "hi": "कोई बात नहीं। कृपया अपनी सुविधा का दिन और समय लिखकर भेजें, {clinic} की टीम नई विज़िट पक्की करेगी।",
+                         "te": "పర్వాలేదు. మీకు అనుకూలమైన రోజు, సమయం జవాబుగా పంపండి, {clinic} బృందం కొత్త సందర్శనను నిర్ధారిస్తుంది."},
+    "visit_unknown": {"en": "We could not find that visit. Please reply with your question and the care team will help.",
+                      "hi": "हमें वह विज़िट नहीं मिली। कृपया अपना सवाल भेजें, देखभाल टीम मदद करेगी।",
+                      "te": "ఆ సందర్శన కనబడలేదు. దయచేసి మీ ప్రశ్న పంపండి, వైద్య బృందం సహాయం చేస్తుంది."},
+    "booked_head": {"en": "Booked visits:", "hi": "बुक की गई विज़िट:", "te": "బుక్ అయిన సందర్శనలు:"},
     "schedule_head": {"en": "Your schedule at {clinic}:", "hi": "{clinic} में आपका शेड्यूल:", "te": "{clinic} లో మీ షెడ్యూల్:"},
     "no_plan": {"en": "No treatment is scheduled at the moment.", "hi": "अभी कोई इलाज निर्धारित नहीं है।", "te": "ప్రస్తుతం ఎలాంటి చికిత్స షెడ్యూల్ లేదు."},
     "skip": {"en": "Reply 0 to skip.", "hi": "छोड़ने के लिए 0 भेजें।", "te": "వదిలేయడానికి 0 పంపండి."},
@@ -200,9 +213,13 @@ TEMPLATES: dict[str, dict[str, Any]] = {
     "discharge": {"name": "oncocare_discharge_summary", "category": "UTILITY",
                   "body": "Hello {{1}}, your {{2}} from {{3}} is ready. You can view and download it in the patient portal at {{4}} or ask us for a printed copy.",
                   "example": ["Lakshmi", "discharge summary", "Thravi OncoCare", "https://onco.thravi.in/portal"]},
-    "reminder": {"name": "oncocare_visit_reminder", "category": "UTILITY",
-                 "body": "Hello {{1}}, this is a reminder of your visit at {{2}} on {{3}}. Note from the care team: {{4}} Reply here if you need to reschedule or have new symptoms.",
-                 "example": ["Lakshmi", "Thravi OncoCare", "Mon 16 Nov 2026, 10:00 AM", "Purpose: follow-up after radiotherapy."]},
+    "reminder": {"name": "oncocare_visit_reminder_v2", "category": "UTILITY",
+                 "body": "Hello {{1}}, this is a reminder of your visit at {{2}} on {{3}}. Note from the care team: {{4}} Please tap Confirm visit or Reschedule below.",
+                 "example": ["Lakshmi", "Thravi OncoCare", "Mon 16 Nov 2026, 10:00 AM", "Purpose: follow-up after radiotherapy."],
+                 "buttons": [{"type": "QUICK_REPLY", "text": "Confirm visit"}, {"type": "QUICK_REPLY", "text": "Reschedule"}]},
+    "document": {"name": "oncocare_document", "category": "UTILITY", "header": "DOCUMENT",
+                 "body": "Hello {{1}}, your care team at {{2}} has shared a document with you: {{3}}. Reply here if you have questions about it.",
+                 "example": ["Lakshmi", "Thravi OncoCare", "CT chest report (02 Nov 2026)"]},
     "reply": {"name": "oncocare_care_team_reply", "category": "UTILITY",
               "body": "Hello {{1}}, your care team at {{2}} replied to your message: {{3}}. Reply here if you have more questions.",
               "example": ["Lakshmi", "Thravi OncoCare", "Please apply the hydrogel dressing twice a day and keep the area dry"]},
@@ -349,8 +366,9 @@ def _parse_send_at(value: Any) -> str | None:
 
 def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> dict[str, Any]:
     kind = payload.get("kind")
-    if kind not in ("plan", "prescription", "discharge", "reminder", "message"):
+    if kind not in ("plan", "prescription", "discharge", "reminder", "document", "message"):
         raise ApiError(422, "Choose what to send")
+    meta: dict[str, Any] | None = None
     with transaction(db) as connection:
         patient = _patient(connection, patient_id)
         if not patient["phone"]:
@@ -399,11 +417,29 @@ def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> di
             extra = (f"Purpose: {purpose}." if purpose else "") + (" Please bring your reports and medicines." if payload.get("bring_reports", True) else "")
             body = f"Hello {name}, this is a reminder of your visit at {clinic()} on {when}. {extra.strip()} Reply here if you need to reschedule or have new symptoms."
             params = [name, clinic(), when, extra.strip() or "We look forward to seeing you."]
-            default_send = datetime.combine(visit_day - timedelta(days=1), datetime.min.time(), IST).replace(hour=10)
-            scheduled = _parse_send_at(payload.get("send_at")) or default_send.astimezone(timezone.utc).replace(microsecond=0).isoformat()
-            if scheduled > datetime.combine(visit_day, datetime.max.time(), IST).astimezone(timezone.utc).isoformat():
-                raise ApiError(422, "The reminder would be sent after the visit")
+            body = f"Hello {name}, this is a reminder of your visit at {clinic()} on {when}. {extra.strip()} Please tap Confirm visit or Reschedule below."
+            if payload.get("send_now"):
+                scheduled = None
+            else:
+                default_send = datetime.combine(visit_day - timedelta(days=1), datetime.min.time(), IST).replace(hour=10)
+                scheduled = _parse_send_at(payload.get("send_at")) or default_send.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+                if scheduled > datetime.combine(visit_day, datetime.max.time(), IST).astimezone(timezone.utc).isoformat():
+                    raise ApiError(422, "The reminder would be sent after the visit")
+                if scheduled <= utc_now():
+                    scheduled = None  # the day-before time has passed: send now
             related_type = "visit"
+            meta = {"visit_date": visit_day.isoformat(), "visit_time": time_text or None, "purpose": purpose or None}
+        elif kind == "document":
+            doc = row_or_none(connection, "SELECT * FROM patient_documents WHERE id = ? AND patient_id = ?", (payload.get("document_id"), patient_id))
+            if not doc:
+                raise ApiError(422, "Choose a document to send", {"fields": ["document_id"]})
+            label = f"{doc['title']} ({_fmt_day(doc['doc_date'])})"
+            note = str(payload.get("note") or "").strip()[:300]
+            body = f"Hello {name}, your care team at {clinic()} has shared a document with you: {label}." + (f"\n\n{note}" if note else "") + \
+                "\n\nReply here if you have questions about it."
+            params = [name, clinic(), label]
+            related_type, related_id = "document", doc["id"]
+            meta = {"document_id": doc["id"], "filename": doc["filename"], "content_type": doc["content_type"]}
         else:
             text = str(payload.get("text") or "").strip()
             if not text:
@@ -411,14 +447,20 @@ def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> di
             body = text[:3500]
         message_id = _store(connection, patient_id, "out", kind, body, "draft", template_name=TEMPLATES.get(kind, {}).get("name"),
                             template_params_json=json.dumps(params) if params else None, related_type=related_type, related_id=related_id,
-                            scheduled_for=scheduled)
+                            scheduled_for=scheduled, meta_json=json.dumps(meta) if meta else None)
+        if kind == "reminder":  # the buttons carry this reminder's id so the patient's answer books the right visit
+            connection.execute("UPDATE whatsapp_messages SET buttons_json = ? WHERE id = ?",
+                               (json.dumps(visit_buttons(message_id, lang), ensure_ascii=False), message_id))
         return _message(connection, message_id) | {"checks": _checks(connection, patient, kind)}
 
 
 def _checks(connection: sqlite3.Connection, patient: dict[str, Any], kind: str) -> list[dict[str, str]]:
     out = []
     if not patient["wa_opt_in"]:
-        out.append({"severity": "alert", "text": "The patient has not opted in to WhatsApp messages. Record consent first."})
+        out.append({"severity": "alert", "text": "WhatsApp is turned off for this patient" +
+                    (" (they sent STOP)." if patient["wa_opt_in_method"] == "patient_stop" else ".") + " Turn it back on first."})
+    if kind == "document" and mode() == "live" and not window_open(connection, patient["id"]):
+        out.append({"severity": "info", "text": "Outside the 24-hour window only a PDF can be attached (approved template 'oncocare_document')."})
     if mode() == "live" and not window_open(connection, patient["id"]) and kind not in TEMPLATES:
         out.append({"severity": "alert", "text": "More than 24 hours since the patient's last message: only approved templates can be sent."})
     if mode() == "live" and not window_open(connection, patient["id"]) and kind in TEMPLATES:
@@ -463,7 +505,7 @@ def approve_and_send(db: str, message_id: int, payload: dict[str, Any], actor: s
             raise ApiError(409, "This message is not a draft")
         patient = _patient(connection, msg["patient_id"])
         if not patient["wa_opt_in"] and not (msg["kind"] in ("reply", "message") and window_open(connection, patient["id"])):
-            raise ApiError(422, "The patient has not opted in to WhatsApp messages")
+            raise ApiError(422, "WhatsApp is turned off for this patient")
         scheduled = _parse_send_at(payload.get("send_at")) if payload.get("send_at") else msg["scheduled_for"]
         connection.execute("UPDATE whatsapp_messages SET approved_by = ?, scheduled_for = ?, updated_at = ? WHERE id = ?",
                            (actor, scheduled, utc_now(), message_id))
@@ -498,16 +540,37 @@ def _send_live(connection: sqlite3.Connection, msg: dict[str, Any], patient: dic
     to = wa_number(patient["phone"])
     if not to:
         raise RuntimeError("The patient has no valid mobile number")
+    meta = json.loads(msg.get("meta_json") or "null") or {}
+    buttons = json.loads(msg.get("buttons_json") or "null") or []
+    document = None
+    if msg["kind"] == "document":
+        doc = row_or_none(connection, "SELECT * FROM patient_documents WHERE id = ?", (meta.get("document_id"),))
+        if not doc or not Path(doc["stored_path"]).exists():
+            raise RuntimeError("The document file is missing")
+        document = {"id": _upload_media_live(Path(doc["stored_path"]), doc["content_type"] or "application/pdf"), "filename": doc["filename"]}
     if window_open(connection, patient["id"]):
-        body = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"body": msg["body"][:4096], "preview_url": True}}
+        if document:
+            body = {"messaging_product": "whatsapp", "to": to, "type": "document", "document": {**document, "caption": msg["body"][:1024]}}
+        elif buttons:
+            body = {"messaging_product": "whatsapp", "to": to, "type": "interactive",
+                    "interactive": {"type": "button", "body": {"text": msg["body"][:1024]},
+                                    "action": {"buttons": [{"type": "reply", "reply": {"id": b["id"], "title": b["title"][:20]}} for b in buttons[:3]]}}}
+        else:
+            body = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"body": msg["body"][:4096], "preview_url": True}}
     else:
         template = TEMPLATES.get(msg["kind"])
         if not template or not msg["template_params_json"]:
             raise RuntimeError("More than 24 hours since the patient's last message; this message type has no approved template")
+        if document and not str(meta.get("content_type") or "").endswith("pdf"):
+            raise RuntimeError("Outside the 24-hour window only PDF documents can be sent; ask the patient to message first or upload a PDF")
         params = json.loads(msg["template_params_json"])
+        components: list[dict[str, Any]] = [{"type": "body", "parameters": [{"type": "text", "text": _one_line(str(p), 1000)} for p in params]}]
+        if document:
+            components.insert(0, {"type": "header", "parameters": [{"type": "document", "document": document}]})
+        for index, button in enumerate(buttons[:len(template.get("buttons") or [])]):
+            components.append({"type": "button", "sub_type": "quick_reply", "index": str(index), "parameters": [{"type": "payload", "payload": button["id"]}]})
         body = {"messaging_product": "whatsapp", "to": to, "type": "template",
-                "template": {"name": template["name"], "language": {"code": _env("WHATSAPP_TEMPLATE_LANG", "en")},
-                             "components": [{"type": "body", "parameters": [{"type": "text", "text": _one_line(str(p), 1000)} for p in params]}]}}
+                "template": {"name": template["name"], "language": {"code": _env("WHATSAPP_TEMPLATE_LANG", "en")}, "components": components}}
     reply = _graph(f"{_env('WHATSAPP_PHONE_NUMBER_ID')}/messages", body)
     return (reply.get("messages") or [{}])[0].get("id") or ""
 
@@ -638,8 +701,8 @@ def run_due(db: str) -> dict[str, int]:
 def set_consent(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> dict[str, Any]:
     opt_in = bool(payload.get("opt_in"))
     method = payload.get("method") or ("in_clinic_verbal" if opt_in else "clinician_opt_out")
-    if opt_in and method not in ("in_clinic_verbal", "in_clinic_written", "patient_whatsapp"):
-        raise ApiError(422, "Record how consent was obtained")
+    if opt_in and method not in ("default", "clinician_on", "in_clinic_verbal", "in_clinic_written", "patient_whatsapp"):
+        raise ApiError(422, "Unknown setting")
     lang = payload.get("language")
     if lang is not None and lang not in LANGS:
         raise ApiError(422, "Language must be en, hi or te")
@@ -675,6 +738,9 @@ def patient_thread(db: str, patient_id: int) -> dict[str, Any]:
         return {"patient": {k: patient[k] for k in ("id", "first_name", "last_name", "medical_record_number", "phone", "preferred_language",
                                                      "wa_opt_in", "wa_opt_in_at", "wa_opt_in_method")} | {"wa_number": wa_number(patient["phone"])},
                 "messages": messages, "window_open": window_open(connection, patient_id), "session": session, "final_summaries": summaries,
+                "documents": rows(connection, "SELECT id, title, doc_date, doc_type, filename, content_type FROM patient_documents WHERE patient_id = ? "
+                                              "ORDER BY doc_date DESC, id DESC", (patient_id,)),
+                "appointments": [_appt_view(r) for r in rows(connection, "SELECT * FROM appointments WHERE patient_id = ? ORDER BY appt_date DESC, id DESC", (patient_id,))],
                 "status": status()}
 
 
@@ -704,6 +770,14 @@ def media_file(db: str, message_id: int, upload_dir: Path) -> Any:
 
 # ---------------------------------------------------------------------------------------------- inbound conversation (agent)
 MENU_IDS = ("menu_complaint", "menu_checkin", "menu_schedule")
+
+
+VISIT_LABELS = {"en": ("Confirm visit", "Reschedule"), "hi": ("विज़िट पक्की करें", "तारीख बदलें"), "te": ("సందర్శన నిర్ధారించు", "తేదీ మార్చండి")}
+
+
+def visit_buttons(reminder_id: int, lang: str = "en") -> list[dict[str, str]]:
+    yes, no = VISIT_LABELS.get(lang, VISIT_LABELS["en"])
+    return [{"id": f"{VISIT_YES}:{reminder_id}", "title": yes}, {"id": f"{VISIT_NO}:{reminder_id}", "title": no}]
 
 
 def menu_buttons(lang: str) -> list[dict[str, str]]:
@@ -844,6 +918,9 @@ def record_facts(connection: sqlite3.Connection, patient: dict[str, Any]) -> str
     for r in rows(connection, "SELECT body, scheduled_for FROM whatsapp_messages WHERE patient_id = ? AND kind = 'reminder' AND status IN ('scheduled', 'sent') "
                               "ORDER BY scheduled_for DESC LIMIT 2", (patient["id"],)):
         lines.append(f"Visit reminder on record: {r['body'][:200]}")
+    booked = _booked_lines(connection, patient["id"])
+    if booked:
+        lines.append("Booked visits (confirmed):\n" + "\n".join(booked))
     return "\n".join(lines)
 
 
@@ -860,7 +937,9 @@ def _schedule_text(connection: sqlite3.Connection, patient: dict[str, Any], lang
         plan = t("no_plan", lang)
     facts = record_facts(connection, patient)
     follow = next((line for line in facts.splitlines() if line.startswith("Follow-up visit:")), "")
-    return f"{t('schedule_head', lang)}\n\n{plan}" + (f"\n\n{follow}" if follow else "")
+    booked = _booked_lines(connection, patient["id"])
+    return f"{t('schedule_head', lang)}\n\n{plan}" + (f"\n\n{follow}" if follow else "") + \
+        (f"\n\n{t('booked_head', lang)}\n" + "\n".join(booked) if booked else "")
 
 
 def _labels(keys: list[str], lang: str) -> str:
@@ -926,6 +1005,19 @@ def receive(db: str, wa_from: str, text: str | None = None, audio: tuple[bytes, 
             connection.execute("UPDATE patients SET preferred_language = ? WHERE id = ?", (lang, pid))
         state = _session(connection, pid)
         word = text.lower().strip(" .!")
+        visit = None
+        if button_id and button_id.split(":")[0] in (VISIT_YES, VISIT_NO):
+            visit, button_id = button_id, None
+        elif not button_id and (state or {}).get("stage") != "questions" and word in CONFIRM_WORDS | RESCHEDULE_WORDS:
+            recent = _open_reminder(connection, pid)
+            if recent:
+                visit = f"{VISIT_YES if word in CONFIRM_WORDS else VISIT_NO}:{recent['id']}"
+        if visit:
+            reminder = row_or_none(connection, "SELECT buttons_json FROM whatsapp_messages WHERE id = ?", (visit.split(":")[-1],))
+            label = next((b["title"] for b in json.loads((reminder or {}).get("buttons_json") or "[]") if b["id"] == visit), visit.split(":")[0])
+            in_id = _store(connection, pid, "in", "button", text or label, "received", wa_from=wa_from, wa_message_id=wa_message_id, channel=channel or mode())
+            result = {"matched": True, "patient_id": pid, "message_id": in_id}
+            return result | _visit_answer(connection, patient, visit, in_id, lang)
         if not button_id and state and state.get("stage") == "menu" and word in ("1", "2", "3"):
             button_id = MENU_IDS[int(word) - 1]
         if button_id and button_id not in MENU_IDS:
@@ -1157,6 +1249,114 @@ def simulate_inbound(db: str, payload: dict[str, Any], upload_dir: Path) -> dict
     return result | ({"thread": patient_thread(db, patient["id"])} if patient else {})
 
 
+# ---------------------------------------------------------------------------------------------- visit reminders -> appointments
+APPT_STATUSES = ("booked", "reschedule_requested", "cancelled", "attended", "missed")
+
+
+def _open_reminder(connection: sqlite3.Connection, patient_id: int) -> dict[str, Any] | None:
+    """The latest sent reminder for a visit that has not happened yet (used when the patient types CONFIRM / RESCHEDULE)."""
+    for r in rows(connection, "SELECT * FROM whatsapp_messages WHERE patient_id = ? AND kind = 'reminder' AND status IN ('sent', 'delivered', 'read') "
+                              "ORDER BY sent_at DESC, id DESC LIMIT 5", (patient_id,)):
+        meta = json.loads(r.get("meta_json") or "null") or {}
+        if meta.get("visit_date") and meta["visit_date"] >= date.today().isoformat():
+            return r
+    return None
+
+
+def _when(appt_date: str, appt_time: str | None) -> str:
+    return _fmt_day(appt_date) + (f", {datetime.strptime(appt_time, '%H:%M').strftime('%I:%M %p').lstrip('0')}" if appt_time else "")
+
+
+def _visit_answer(connection: sqlite3.Connection, patient: dict[str, Any], visit: str, in_id: int, lang: str) -> dict[str, Any]:
+    """Patient tapped Confirm visit / Reschedule on a reminder: book (or flag) the appointment for that day."""
+    choice, _, rid = visit.partition(":")
+    pid = patient["id"]
+    reminder = row_or_none(connection, "SELECT * FROM whatsapp_messages WHERE id = ? AND patient_id = ? AND kind = 'reminder'", (rid if rid.isdigit() else -1, pid))
+    meta = json.loads((reminder or {}).get("meta_json") or "null") or {}
+    if not reminder or not meta.get("visit_date"):
+        _bot(connection, pid, t("visit_unknown", lang), buttons=menu_buttons(lang))
+        return {"action": "visit_unknown"}
+    status_ = "booked" if choice == VISIT_YES else "reschedule_requested"
+    now = utc_now()
+    existing = row_or_none(connection, "SELECT id FROM appointments WHERE reminder_message_id = ?", (reminder["id"],))
+    if existing:
+        connection.execute("UPDATE appointments SET status = ?, confirmed_at = ?, updated_at = ? WHERE id = ?",
+                           (status_, now if status_ == "booked" else None, now, existing["id"]))
+        appt_id = existing["id"]
+    else:
+        appt_id = connection.execute(
+            """INSERT INTO appointments (patient_id, appt_date, appt_time, purpose, status, source, reminder_message_id, confirmed_at, created_by, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, 'whatsapp', ?, ?, 'Patient (WhatsApp)', ?, ?)""",
+            (pid, meta["visit_date"], meta.get("visit_time"), meta.get("purpose"), status_, reminder["id"], now if status_ == "booked" else None, now, now)).lastrowid
+    if status_ == "booked":
+        _save_session(connection, pid, None)
+        _bot(connection, pid, t("visit_confirmed", lang, when=_when(meta["visit_date"], meta.get("visit_time"))))
+    else:  # their next message (the day that suits them) goes to the clinician inbox as a complaint/request
+        _save_session(connection, pid, {"stage": "complaint", "lang": lang, "message_ids": [in_id]})
+        _bot(connection, pid, t("visit_reschedule", lang))
+    return {"action": "visit_" + ("booked" if status_ == "booked" else "reschedule"), "appointment_id": appt_id}
+
+
+def _appt_view(row: dict[str, Any]) -> dict[str, Any]:
+    return row | {"when": _when(row["appt_date"], row["appt_time"]), "upcoming": row["appt_date"] >= date.today().isoformat()}
+
+
+def appointments(db: str, patient_id: int) -> list[dict[str, Any]]:
+    with transaction(db) as connection:
+        _patient(connection, patient_id)
+        return [_appt_view(r) for r in rows(connection, "SELECT * FROM appointments WHERE patient_id = ? ORDER BY appt_date DESC, appt_time DESC, id DESC", (patient_id,))]
+
+
+def create_appointment(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> dict[str, Any]:
+    try:
+        day = date.fromisoformat(str(payload.get("appt_date"))[:10])
+    except (TypeError, ValueError):
+        raise ApiError(422, "Choose the visit date", {"fields": ["appt_date"]}) from None
+    time_text = str(payload.get("appt_time") or "").strip()[:5] or None
+    if time_text and not re.fullmatch(r"\d{2}:\d{2}", time_text):
+        raise ApiError(422, "Visit time must be HH:MM")
+    with transaction(db) as connection:
+        _patient(connection, patient_id)
+        now = utc_now()
+        appt_id = connection.execute(
+            """INSERT INTO appointments (patient_id, appt_date, appt_time, purpose, status, source, confirmed_at, created_by, created_at, updated_at)
+               VALUES (?, ?, ?, ?, 'booked', 'clinician', ?, ?, ?, ?)""",
+            (patient_id, day.isoformat(), time_text, str(payload.get("purpose") or "").strip()[:200] or None, now, actor, now, now)).lastrowid
+        return _appt_view(row_or_none(connection, "SELECT * FROM appointments WHERE id = ?", (appt_id,)))
+
+
+def update_appointment(db: str, appt_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    with transaction(db) as connection:
+        appt = row_or_none(connection, "SELECT * FROM appointments WHERE id = ?", (appt_id,))
+        if not appt:
+            raise ApiError(404, "Appointment not found")
+        fields: dict[str, Any] = {}
+        if "status" in payload:
+            if payload["status"] not in APPT_STATUSES:
+                raise ApiError(422, "Unknown appointment status")
+            fields["status"] = payload["status"]
+            if payload["status"] == "booked" and not appt["confirmed_at"]:
+                fields["confirmed_at"] = utc_now()
+        if "appt_date" in payload:
+            try:
+                fields["appt_date"] = date.fromisoformat(str(payload["appt_date"])[:10]).isoformat()
+            except ValueError:
+                raise ApiError(422, "Visit date must be YYYY-MM-DD") from None
+        if "appt_time" in payload:
+            fields["appt_time"] = str(payload["appt_time"] or "").strip()[:5] or None
+        if not fields:
+            raise ApiError(422, "Nothing to change")
+        fields["updated_at"] = utc_now()
+        connection.execute(f"UPDATE appointments SET {', '.join(f'{k} = ?' for k in fields)} WHERE id = ?", (*fields.values(), appt_id))
+        return _appt_view(row_or_none(connection, "SELECT * FROM appointments WHERE id = ?", (appt_id,)))
+
+
+def _booked_lines(connection: sqlite3.Connection, patient_id: int) -> list[str]:
+    return [f"• {_when(r['appt_date'], r['appt_time'])}" + (f" – {r['purpose']}" if r["purpose"] else "")
+            for r in rows(connection, "SELECT * FROM appointments WHERE patient_id = ? AND status = 'booked' AND appt_date >= ? ORDER BY appt_date, appt_time",
+                          (patient_id, date.today().isoformat()))]
+
+
 # ---------------------------------------------------------------------------------------------- doctor actions -> WhatsApp
 def notify(db: str, patient_id: int, kind: str, actor: str, **payload: Any) -> dict[str, Any]:
     """Send what the doctor just did in the app (plan, prescription, summary, reminder). The doctor's action is the approval.
@@ -1166,7 +1366,7 @@ def notify(db: str, patient_id: int, kind: str, actor: str, **payload: Any) -> d
     if not patient or not patient["phone"]:
         return {"kind": kind, "status": "skipped", "reason": "no mobile number"}
     if not patient["wa_opt_in"]:
-        return {"kind": kind, "status": "skipped", "reason": "patient has not opted in to WhatsApp"}
+        return {"kind": kind, "status": "skipped", "reason": "WhatsApp is turned off for this patient"}
     try:
         draft = compose(db, patient_id, {"kind": kind, **payload}, actor)
         sent = approve_and_send(db, draft["id"], {}, actor)
@@ -1215,8 +1415,9 @@ def handle_webhook(db: str, raw: bytes, signature: str | None, upload_dir: Path)
                 text, audio, button = None, None, None
                 if kind == "text":
                     text = (message.get("text") or {}).get("body")
-                elif kind == "button":
-                    text = (message.get("button") or {}).get("text")
+                elif kind == "button":  # quick reply on a template: the payload is the button id we set when sending
+                    choice = message.get("button") or {}
+                    text, button = choice.get("text"), choice.get("payload") or None
                 elif kind == "interactive":
                     inter = message.get("interactive") or {}
                     choice = inter.get("button_reply") or inter.get("list_reply") or {}

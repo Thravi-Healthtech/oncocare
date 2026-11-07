@@ -1,8 +1,19 @@
 "use strict";
 /* WhatsApp: consent, clinician-approved outbound messages, reminders and the patient chat (simulator or live). */
 
-const WA_KIND = { plan: "Treatment plan", prescription: "Prescription", discharge: "Discharge summary", reminder: "Visit reminder", message: "Message", reply: "Reply to patient message", bot: "Automatic reply" };
-const WA_CONSENT = { in_clinic_verbal: "verbal consent in clinic", in_clinic_written: "written consent in clinic", patient_whatsapp: "patient sent START", patient_stop: "patient sent STOP", clinician_opt_out: "turned off by clinician" };
+const WA_KIND = { plan: "Treatment plan", prescription: "Prescription", discharge: "Discharge summary", reminder: "Visit reminder", document: "Document", message: "Message", reply: "Reply to patient message", bot: "Automatic reply" };
+const WA_CONSENT = { default: "on by default", clinician_on: "turned on by clinician", in_clinic_verbal: "verbal consent in clinic", in_clinic_written: "written consent in clinic", patient_whatsapp: "patient sent START", patient_stop: "patient sent STOP", clinician_opt_out: "turned off by clinician" };
+const APPT_STATUS = { booked: "Booked", reschedule_requested: "Wants to reschedule", cancelled: "Cancelled", attended: "Attended", missed: "Missed" };
+function waStateText(p) {
+  return p.wa_opt_in ? (!p.wa_opt_in_method || p.wa_opt_in_method === "default" ? "On by default" : `On (${esc(WA_CONSENT[p.wa_opt_in_method] || p.wa_opt_in_method)})`)
+    : `<span class="text-amber">Off — ${esc(WA_CONSENT[p.wa_opt_in_method] || "turned off")}</span>`;
+}
+function apptRows(list, pid) {
+  if (!list?.length) return '<p class="muted small">No appointments yet. When the patient taps <strong>Confirm visit</strong> on a reminder, the visit is booked here.</p>';
+  return list.map(a => `<div class="note-item appt-${a.status}"><strong>${esc(a.when)}</strong> <span class="chip ${a.status === "reschedule_requested" ? "chip-warn" : a.status === "booked" ? "chip-ok" : ""}">${esc(APPT_STATUS[a.status] || a.status)}</span>
+    <p class="muted small">${a.purpose ? esc(a.purpose) + " · " : ""}${a.source === "whatsapp" ? "patient answered on WhatsApp" : `booked by ${esc(a.created_by || "clinic")}`}</p>
+    ${a.upcoming && ["booked", "reschedule_requested"].includes(a.status) ? `<div class="heading-actions wrap">${a.status === "reschedule_requested" ? `<button class="text-button" data-appt="booked" data-id="${a.id}" data-patient="${pid}">Mark booked</button>` : ""}<button class="text-button" data-appt="attended" data-id="${a.id}" data-patient="${pid}">Attended</button><button class="text-button" data-appt="cancelled" data-id="${a.id}" data-patient="${pid}">Cancel</button></div>` : ""}</div>`).join("");
+}
 const LANG_NAME = { en: "English", hi: "Hindi", te: "Telugu" };
 
 EXT.routes.whatsapp = async id => {
@@ -10,12 +21,16 @@ EXT.routes.whatsapp = async id => {
   await loadWa();
   return "whatsapp";
 };
+EXT.patientLoaders.push(async p => { p.appointments = await api(`/api/patients/${p.id}/appointments`).catch(() => []); });
 EXT.patientPanels.push(p => `<article class="panel span-full wa-panel"><div class="panel-heading"><div><p class="eyebrow">WhatsApp</p><h2>Patient messaging</h2></div><a class="button secondary" href="#whatsapp/${p.id}">Open chat</a></div>
-  <p class="muted">${!p.phone ? "Add the patient's mobile number to use WhatsApp." : p.wa_opt_in ? `✓ Opted in (${esc(WA_CONSENT[p.wa_opt_in_method] || p.wa_opt_in_method || "")}${p.wa_opt_in_at ? `, ${fmtDate(p.wa_opt_in_at)}` : ""}) · +${esc(waNumber(p.phone))}${p.preferred_language ? ` · ${LANG_NAME[p.preferred_language] || p.preferred_language}` : ""}` : `Not opted in. Record the patient's consent before sending plans or reminders. Patients can still message the clinic; replies to their messages are allowed.`}</p>
-  ${p.phone ? `<div class="heading-actions wrap">${p.wa_opt_in ? "" : `<button class="button primary small" data-wa="consent" data-patient="${p.id}">Record consent</button>`}
+  <p class="muted">${!p.phone ? "Add the patient's mobile number to use WhatsApp." : `WhatsApp: ${waStateText(p)} · +${esc(waNumber(p.phone))}${p.preferred_language ? ` · ${LANG_NAME[p.preferred_language] || p.preferred_language}` : ""} <button class="text-button" data-wa="consent" data-patient="${p.id}">${p.wa_opt_in ? "Turn off" : "Turn on"}</button>`}</p>
+  ${p.phone ? `<div class="heading-actions wrap">
     <button class="button secondary small" data-wa-share="plan" data-patient="${p.id}">Share treatment plan</button>
-    <button class="button secondary small" data-wa-share="reminder" data-patient="${p.id}">Visit reminder</button>
+    <button class="button primary small" data-wa-share="reminder" data-patient="${p.id}">Send follow-up reminder</button>
+    <button class="button secondary small" data-wa-share="document" data-patient="${p.id}">Send document</button>
     ${(p.discharge_summaries || []).some(d => d.status === "final") ? `<button class="button secondary small" data-wa-share="discharge" data-patient="${p.id}">Share discharge summary</button><button class="button secondary small" data-wa-share="prescription" data-patient="${p.id}">Send prescription</button>` : ""}</div>` : ""}
+  <h3 class="top-gap">Appointments <button class="text-button small" data-wa="book" data-patient="${p.id}">+ Book visit</button></h3>
+  ${apptRows(p.appointments, p.id)}
 </article>`);
 function waNumber(phone) { const d = String(phone || "").replace(/\D/g, ""); return d.length === 10 ? `91${d}` : d; }
 
@@ -89,7 +104,7 @@ function renderWa() {
         <a class="wa-thread ${x.id === S.waPatientId ? "active" : ""}" href="#whatsapp/${x.id}">
           <span class="avatar">${esc(initials(x))}</span>
           <span class="wa-thread-main"><strong>${esc(x.first_name)} ${esc(x.last_name)}</strong><small>${x.last_body ? `${x.last_direction === "in" ? "" : "You: "}${esc(x.last_body.slice(0, 60))}` : esc(x.medical_record_number)}</small></span>
-          <span class="wa-thread-side">${x.open_reports ? `<span class="nav-badge">${x.open_reports}</span>` : ""}${x.wa_opt_in ? "" : '<small class="muted">no opt-in</small>'}</span>
+          <span class="wa-thread-side">${x.open_reports ? `<span class="nav-badge">${x.open_reports}</span>` : ""}${x.wa_opt_in ? "" : '<small class="muted">WhatsApp off</small>'}</span>
         </a>`).join("") || '<p class="muted">Patients with a mobile number appear here.</p>'}</div>
       ${S.wa?.unmatched?.length ? `<details class="wa-unmatched"><summary>${S.wa.unmatched.length} message(s) from unregistered numbers</summary>${S.wa.unmatched.map(u => `<p class="small"><strong>+${esc(u.wa_from)}</strong> ${fmtDateTime(u.created_at)}<br>${esc(u.body)}</p>`).join("")}</details>` : ""}
     </aside>
@@ -103,9 +118,10 @@ function renderWa() {
       : `<div class="wa-compose live-note">Patients message your WhatsApp Business number; their messages arrive here and in Patient messages.</div>`}
     </section>
     <aside class="wa-side">
-      <article class="panel"><p class="eyebrow">Consent</p>
-        ${p.wa_opt_in ? `<p><strong>✓ Opted in</strong><br><span class="muted">${esc(WA_CONSENT[p.wa_opt_in_method] || p.wa_opt_in_method || "")}${p.wa_opt_in_at ? ` · ${fmtDate(p.wa_opt_in_at)}` : ""}</span></p><button class="text-button" data-wa="consent" data-patient="${p.id}">Change</button>`
-          : `<p class="muted">${p.wa_opt_in_method === "patient_stop" ? "The patient sent STOP." : "Not opted in."} Plans, prescriptions and reminders need the patient's consent.</p><button class="button primary small" data-wa="consent" data-patient="${p.id}">Record consent</button>`}
+      <article class="panel"><p class="eyebrow">WhatsApp</p>
+        <p><strong>${waStateText(p)}</strong></p>
+        <p class="muted small">${p.wa_opt_in ? "Messages go out without a separate opt-in. The patient can reply STOP at any time." : p.wa_opt_in_method === "patient_stop" ? "The patient sent STOP; they can send START to turn it back on." : "Turned off for this patient."}</p>
+        <button class="text-button" data-wa="consent" data-patient="${p.id}">${p.wa_opt_in ? "Turn off / language" : "Turn on"}</button>
         <p class="muted small">Language: ${LANG_NAME[p.preferred_language] || "English"} (automatic replies and questions)</p>
       </article>
       <article class="panel top-gap"><p class="eyebrow">Agent</p>
@@ -115,14 +131,16 @@ function renderWa() {
       <article class="panel top-gap"><p class="eyebrow">Send to patient</p><p class="muted small">Plans, prescriptions, summaries and reminders also go out automatically when you save them in the chart (tick "Send on WhatsApp"). Use these to send one now.</p>
         <div class="wa-actions">
           <button class="button secondary" data-wa-share="plan" data-patient="${p.id}">Treatment plan</button>
-          <button class="button secondary" data-wa-share="reminder" data-patient="${p.id}">Visit reminder</button>
+          <button class="button secondary" data-wa-share="reminder" data-patient="${p.id}">Follow-up reminder</button>
+          <button class="button secondary" data-wa-share="document" data-patient="${p.id}" ${t.documents?.length ? "" : "disabled title=\"Upload a document in the running summary first\""}>Document</button>
           <button class="button secondary" data-wa-share="discharge" data-patient="${p.id}" ${t.final_summaries.length ? "" : "disabled title=\"Finalise a discharge summary first\""}>Discharge summary</button>
           <button class="button secondary" data-wa-share="prescription" data-patient="${p.id}" ${t.final_summaries.length ? "" : "disabled title=\"Finalise a discharge summary with medicines first\""}>Prescription</button>
           <button class="button secondary" data-wa-share="message" data-patient="${p.id}">Free-text message</button>
         </div>
       </article>
+      <article class="panel top-gap"><p class="eyebrow">Appointments</p>${apptRows(t.appointments, p.id)}<button class="text-button small" data-wa="book" data-patient="${p.id}">+ Book visit</button></article>
       ${scheduled.length ? `<article class="panel top-gap"><p class="eyebrow">Scheduled</p>${scheduled.map(m => `<div class="note-item"><strong>${esc(WA_KIND[m.kind] || m.kind)}</strong><p class="muted small">${fmtDateTime(m.scheduled_for)}</p><button class="text-button" data-wa="cancel" data-message="${m.id}">Cancel</button></div>`).join("")}</article>` : ""}
-      ${st.mode === "live" ? `<article class="panel top-gap"><p class="eyebrow">Live connection</p><p class="muted small">Webhook: <code>${esc(location.origin)}/api/whatsapp/webhook</code>${st.webhook_signed ? " · signed" : " · <span class=\"text-amber\">set WHATSAPP_APP_SECRET</span>"}</p>${st.note ? `<p class="ai-error">${esc(st.note)}</p>` : ""}</article>` : `<article class="panel top-gap"><p class="eyebrow">Going live</p><p class="muted small">Set <code>WHATSAPP_MODE=live</code>, the access token and phone number ID in <code>.env</code>, and submit the five message templates (<button class="text-button small" data-wa="templates">view</button>) for approval.</p></article>`}
+      ${st.mode === "live" ? `<article class="panel top-gap"><p class="eyebrow">Live connection</p><p class="muted small">Webhook: <code>${esc(location.origin)}/api/whatsapp/webhook</code>${st.webhook_signed ? " · signed" : " · <span class=\"text-amber\">set WHATSAPP_APP_SECRET</span>"}</p>${st.note ? `<p class="ai-error">${esc(st.note)}</p>` : ""}</article>` : `<article class="panel top-gap"><p class="eyebrow">Going live</p><p class="muted small">Set <code>WHATSAPP_MODE=live</code>, the access token and phone number ID in <code>.env</code>, and submit the message templates (<button class="text-button small" data-wa="templates">view</button>) for approval.</p></article>`}
     </aside>` : `<section class="wa-phone"><div class="wa-empty">Choose a patient.</div></section><aside></aside>`}
   </div>`;
   const body = $("#waBody");
@@ -147,12 +165,21 @@ async function startShare(kind, opts) {
   const name = `${thread.patient.first_name} ${thread.patient.last_name}`;
   if (kind === "reminder") {
     const d = opts.visit || addDays(todayISO(), 7);
-    return waModal("Visit reminder", `${name} · sent the day before at 10:00 unless you choose a time`, `
+    return waModal("Follow-up reminder", `${name} · the patient gets Confirm visit / Reschedule buttons; Confirm books the appointment`, `
       <div class="form-grid three"><label class="field"><span>Visit date</span><input type="date" name="visit_date" min="${todayISO()}" value="${esc(d)}" required /></label>
       <label class="field"><span>Visit time</span><input type="time" name="visit_time" value="10:00" /></label>
-      <label class="field"><span>Send at (optional)</span><input type="datetime-local" name="send_at" /></label>
+      <label class="field"><span>When to send</span><select name="when"><option value="now">Now</option><option value="day_before">Day before at 10:00</option><option value="at">At a set time…</option></select></label>
+      <label class="field" id="waSendAtField" style="display:none"><span>Send at</span><input type="datetime-local" name="send_at" /></label>
       <label class="field span-3"><span>Purpose</span><input name="purpose" maxlength="200" value="${esc(opts.with ? `Follow-up with ${opts.with}` : "")}" placeholder="e.g. Weekly review during radiotherapy" /></label></div>
       <label class="confirm-check"><input type="checkbox" name="bring_reports" checked /><span>Remind them to bring reports and medicines</span></label>`, "Preview message");
+  }
+  if (kind === "document") {
+    const docs = thread.documents || [];
+    if (!docs.length) return showToast("Upload the document in the patient's running summary first.");
+    return waModal("Send a document", `${name} · the file is attached on WhatsApp`, `
+      <label class="field"><span>Document</span><select name="document_id">${docs.map(d => `<option value="${d.id}" ${String(d.id) === String(opts.document || "") ? "selected" : ""}>${esc(d.title)} · ${fmtDate(d.doc_date)} · ${esc(d.filename)}</option>`).join("")}</select></label>
+      <label class="field"><span>Note to the patient (optional)</span><input name="note" maxlength="300" placeholder="e.g. Please bring a printed copy to your next visit" /></label>
+      ${S.wa?.status?.mode === "live" && !thread.window_open ? '<p class="muted small">Outside the 24-hour window only PDFs can be attached.</p>' : ""}`, "Preview message");
   }
   if (kind === "message") {
     return waModal("Message the patient", `${name}${thread.window_open ? "" : " · outside the 24-hour window (live mode needs a template)"}`, `<label class="field"><span>Message</span><textarea name="text" rows="5" maxlength="3500" required></textarea></label>`, "Preview message");
@@ -169,8 +196,8 @@ async function composeNow(extra) {
   const p = c.thread.patient;
   const scheduled = draft.scheduled_for && draft.scheduled_for > new Date().toISOString();
   waModal(`${WA_KIND[c.kind]} · review before sending`, `To ${p.first_name} ${p.last_name} · +${p.wa_number}`, `
-    ${draft.checks.map(ch => `<p class="${ch.severity === "alert" ? "check-alert" : "safety-banner"}">${esc(ch.text)}${ch.severity === "alert" && !p.wa_opt_in ? ` <button type="button" class="text-button" data-wa="consent" data-patient="${p.id}">Record consent</button>` : ""}</p>`).join("")}
-    <div class="wa-preview"><div class="wa-msg out"><div class="wa-text" id="waPreviewText">${esc(draft.body)}</div></div></div>
+    ${draft.checks.map(ch => `<p class="${ch.severity === "alert" ? "check-alert" : "safety-banner"}">${esc(ch.text)}${ch.severity === "alert" && !p.wa_opt_in ? ` <button type="button" class="text-button" data-wa="consent" data-patient="${p.id}">Turn on</button>` : ""}</p>`).join("")}
+    <div class="wa-preview"><div class="wa-msg out">${c.kind === "document" ? `<small class="wa-label">📄 ${esc(draft.meta?.filename || "document")} attached</small>` : ""}<div class="wa-text" id="waPreviewText">${esc(draft.body)}</div></div>${draft.buttons?.length ? `<div class="wa-buttons">${draft.buttons.map(b => `<button type="button" disabled>${esc(b.title)}</button>`).join("")}</div>` : ""}</div>
     <label class="field"><span>Message (you can edit before approving)</span><textarea name="body" rows="9" maxlength="3500">${esc(draft.body)}</textarea></label>
     ${scheduled ? `<p class="muted">Will be sent on <strong>${fmtDateTime(draft.scheduled_for)}</strong>.</p>` : ""}
     ${draft.template_name ? `<p class="muted small">Outside the 24-hour window, live mode sends the approved template <code>${esc(draft.template_name)}</code> with these details on one line.</p>` : ""}
@@ -182,7 +209,12 @@ $("#waForm").addEventListener("submit", async event => {
   const form = event.currentTarget, f = form.elements, c = S.waCompose;
   await withBusy(form, async () => {
     if (!c.draft) {
-      if (c.kind === "reminder") return composeNow({ visit_date: f.visit_date.value, visit_time: f.visit_time.value, purpose: f.purpose.value, bring_reports: f.bring_reports.checked, send_at: f.send_at.value || null });
+      if (c.kind === "reminder") {
+        if (f.when.value === "at" && !f.send_at.value) throw new Error("Choose when to send it.");
+        return composeNow({ visit_date: f.visit_date.value, visit_time: f.visit_time.value, purpose: f.purpose.value, bring_reports: f.bring_reports.checked,
+          send_now: f.when.value === "now", send_at: f.when.value === "at" ? f.send_at.value : null });
+      }
+      if (c.kind === "document") return composeNow({ document_id: f.document_id.value, note: f.note.value });
       if (c.kind === "message") return composeNow({ text: f.text.value });
       return composeNow({ summary_id: f.summary_id?.value || null });
     }
@@ -192,10 +224,12 @@ $("#waForm").addEventListener("submit", async event => {
     closeModals();
     showToast(sent.status === "scheduled" ? `Reminder scheduled for ${fmtDateTime(sent.scheduled_for)}.` : sent.status === "sent" ? "Sent on WhatsApp." : `Not sent: ${sent.error || sent.status}`);
     c.draft = null;
+    if (S.patient?.id === c.pid && S.view !== "whatsapp") await loadPatient(c.pid);
     if (S.view === "whatsapp") { S.waPatientId = c.pid; await loadWa(); }
   });
 });
 $("#waModal").addEventListener("input", e => { if (e.target.name === "body") $("#waPreviewText").textContent = e.target.value; });
+$("#waModal").addEventListener("change", e => { if (e.target.name === "when") $("#waSendAtField").style.display = e.target.value === "at" ? "" : "none"; });
 
 function openConsent(pid) {
   const resume = !$("#waModal").hidden && S.waCompose?.draft ? S.waCompose : null;
@@ -203,20 +237,19 @@ function openConsent(pid) {
   const thread = S.waCompose?.thread?.patient?.id === pid ? S.waCompose.thread : S.waThread?.patient?.id === pid ? S.waThread : null;
   const p = thread?.patient || (S.patient?.id === pid ? S.patient : {});
   $("#recDialogEyebrow").textContent = "WhatsApp";
-  $("#recDialogTitle").textContent = "Patient consent for WhatsApp";
-  $("#recDialogSub").textContent = "Needed before sending treatment plans, prescriptions, summaries or reminders. The patient can reply STOP at any time.";
-  $("#recDialogBody").innerHTML = `<fieldset class="outcome-options compact-options"><legend>Consent</legend>
-      <label><input type="radio" name="opt" value="in_clinic_written" ${p.wa_opt_in_method !== "in_clinic_verbal" ? "checked" : ""} /><span><strong>Opted in — written consent in clinic</strong></span></label>
-      <label><input type="radio" name="opt" value="in_clinic_verbal" ${p.wa_opt_in_method === "in_clinic_verbal" ? "checked" : ""} /><span><strong>Opted in — verbal consent in clinic</strong></span></label>
-      <label><input type="radio" name="opt" value="off" /><span><strong>Not opted in / withdraw</strong><small>Scheduled reminders are cancelled</small></span></label></fieldset>
+  $("#recDialogTitle").textContent = "WhatsApp for this patient";
+  $("#recDialogSub").textContent = "WhatsApp is on for every patient with a mobile number. Turn it off for a patient who does not want messages; they can also reply STOP.";
+  $("#recDialogBody").innerHTML = `<fieldset class="outcome-options compact-options"><legend>WhatsApp messages</legend>
+      <label><input type="radio" name="opt" value="clinician_on" ${p.wa_opt_in !== 0 ? "checked" : ""} /><span><strong>On</strong><small>Plans, reminders, documents and replies are sent</small></span></label>
+      <label><input type="radio" name="opt" value="off" ${p.wa_opt_in === 0 ? "checked" : ""} /><span><strong>Off</strong><small>Nothing is sent; scheduled reminders are cancelled</small></span></label></fieldset>
     <label class="field"><span>Language for automatic replies and questions</span><select name="language">${Object.entries(LANG_NAME).map(([k, v]) => `<option value="${k}" ${p.preferred_language === k ? "selected" : ""}>${v}</option>`).join("")}</select></label>
     <p class="muted small">Hindi and Telugu texts are prototype translations awaiting native-speaker review.</p>`;
-  $("#recDialogSubmit").textContent = "Save consent";
+  $("#recDialogSubmit").textContent = "Save";
   formError($("#recDialogForm"), "");
   S.recSubmit = async f => {
     const opt = f.opt.value;
     await post(`/api/patients/${pid}/whatsapp/consent`, { opt_in: opt !== "off", method: opt === "off" ? "clinician_opt_out" : opt, language: f.language.value });
-    showToast(opt === "off" ? "WhatsApp messages turned off for this patient." : "Consent recorded.");
+    showToast(opt === "off" ? "WhatsApp messages turned off for this patient." : "WhatsApp is on for this patient.");
     if (S.patient?.id === pid) await loadPatient(pid);
     if (S.view === "whatsapp") await loadWa();
     if (resume && opt !== "off") {
@@ -226,6 +259,34 @@ function openConsent(pid) {
   };
   openModal("recDialog");
 }
+function openBooking(pid) {
+  $("#recDialogEyebrow").textContent = "Appointments";
+  $("#recDialogTitle").textContent = "Book a visit";
+  $("#recDialogSub").textContent = "Records a booked visit. To ask the patient, send a follow-up reminder instead: their Confirm books it.";
+  $("#recDialogBody").innerHTML = `<div class="form-grid three"><label class="field"><span>Date</span><input type="date" name="appt_date" min="${todayISO()}" value="${addDays(todayISO(), 7)}" required /></label>
+    <label class="field"><span>Time</span><input type="time" name="appt_time" value="10:00" /></label>
+    <label class="field"><span>Purpose</span><input name="purpose" maxlength="200" placeholder="e.g. Review" /></label></div>`;
+  $("#recDialogSubmit").textContent = "Book visit";
+  formError($("#recDialogForm"), "");
+  S.recSubmit = async f => {
+    await post(`/api/patients/${pid}/appointments`, { appt_date: f.appt_date.value, appt_time: f.appt_time.value, purpose: f.purpose.value });
+    showToast("Visit booked.");
+    if (S.patient?.id === pid) await loadPatient(pid);
+    if (S.view === "whatsapp") await loadWa();
+  };
+  openModal("recDialog");
+}
+document.addEventListener("click", async e => {
+  const el = e.target.closest("[data-appt]");
+  if (!el) return;
+  const pid = Number(el.dataset.patient);
+  try {
+    await patch(`/api/appointments/${el.dataset.id}`, { status: el.dataset.appt });
+    showToast(`Appointment marked ${APPT_STATUS[el.dataset.appt].toLowerCase()}.`);
+    if (S.patient?.id === pid && S.view !== "whatsapp") await loadPatient(pid);
+    if (S.view === "whatsapp") await loadWa();
+  } catch (error) { showToast(error.message); }
+});
 function showTemplates() {
   api("/api/whatsapp/templates").then(list => {
     $("#recDialogEyebrow").textContent = "WhatsApp Business";
@@ -298,6 +359,7 @@ document.addEventListener("click", async event => {
   try {
     switch (el.dataset.wa) {
       case "consent": return openConsent(Number(el.dataset.patient));
+      case "book": return openBooking(Number(el.dataset.patient));
       case "quick": return simulate({ text: el.dataset.text });
       case "button": return simulate({ button_id: el.dataset.id });
       case "listen": {

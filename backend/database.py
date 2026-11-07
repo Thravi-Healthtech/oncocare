@@ -475,6 +475,23 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 CREATE INDEX IF NOT EXISTS idx_wa_patient ON whatsapp_messages(patient_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_wa_due ON whatsapp_messages(status, scheduled_for);
 
+CREATE TABLE IF NOT EXISTS appointments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    appt_date TEXT NOT NULL,
+    appt_time TEXT,
+    purpose TEXT,
+    status TEXT NOT NULL DEFAULT 'booked' CHECK (status IN ('booked', 'reschedule_requested', 'cancelled', 'attended', 'missed')),
+    source TEXT NOT NULL DEFAULT 'clinician',
+    reminder_message_id INTEGER REFERENCES whatsapp_messages(id) ON DELETE SET NULL,
+    confirmed_at TEXT,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_appointments_patient ON appointments(patient_id, appt_date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_appointments_reminder ON appointments(reminder_message_id) WHERE reminder_message_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS whatsapp_sessions (
     patient_id INTEGER PRIMARY KEY REFERENCES patients(id) ON DELETE CASCADE,
     state_json TEXT NOT NULL,
@@ -578,6 +595,13 @@ def migrate(db_path: str | Path) -> None:
                 if name not in existing:
                     connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
         connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_phone ON patients(phone) WHERE phone IS NOT NULL")
+        # WhatsApp is on by default (no separate opt-in): every patient can be messaged unless they sent STOP
+        # or a clinician turned it off for them. New patients get it through the trigger.
+        connection.execute("""UPDATE patients SET wa_opt_in = 1, wa_opt_in_method = 'default', wa_opt_in_at = COALESCE(wa_opt_in_at, ?)
+                              WHERE wa_opt_in = 0 AND COALESCE(wa_opt_in_method, '') NOT IN ('patient_stop', 'clinician_opt_out')""", (utc_now(),))
+        connection.execute("""CREATE TRIGGER IF NOT EXISTS trg_patients_wa_default AFTER INSERT ON patients
+                              WHEN NEW.wa_opt_in = 0 AND NEW.wa_opt_in_method IS NULL
+                              BEGIN UPDATE patients SET wa_opt_in = 1, wa_opt_in_method = 'default', wa_opt_in_at = NEW.created_at WHERE id = NEW.id; END""")
         connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clinicians_username ON clinicians(username) WHERE username IS NOT NULL")
         _seed_staff_accounts(connection)
         # Normalise legacy cycle statuses and backfill per-drug rows for single-drug cycles.
