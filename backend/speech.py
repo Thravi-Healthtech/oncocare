@@ -44,6 +44,8 @@ def _request(path: str, data: bytes, content_type: str, timeout: float = 60) -> 
         raise RuntimeError(f"Sarvam HTTP {error.code}: {detail or error.reason}") from None
     except urllib.error.URLError as error:
         raise RuntimeError(f"Cannot reach api.sarvam.ai ({error.reason})") from None
+    except OSError as error:  # a timeout waiting for the reply is not wrapped in URLError
+        raise RuntimeError(f"No reply from api.sarvam.ai ({error or type(error).__name__})") from None
 
 
 def short_lang(code: str | None) -> str | None:

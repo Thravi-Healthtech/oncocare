@@ -159,13 +159,16 @@ def _sx_notify(ctx: Ctx, case_id: int | None, patient_id: int | None = None) -> 
     data = sx.create(ctx.db, patient_id, body, ctx.actor) if case_id is None else sx.update(ctx.db, case_id, body, ctx.actor)
     c = data["case"]
     date_changed = c["surgery_date"] and (before is None or before["surgery_date"] != c["surgery_date"] or before["status"] != c["status"])
+    if before and (before["surgery_date"] != c["surgery_date"] or c["status"] == "cancelled"):
+        whatsapp.cancel_reminders(ctx.db, c["patient_id"], [f"surgery:{c['id']}"])  # the admission reminder already scheduled is for the old date
     if body.get("notify_whatsapp") and (date_changed or c["status"] == "cancelled"):
         sent = [whatsapp.notify(ctx.db, c["patient_id"], "plan", ctx.actor)]
         if c["status"] == "scheduled":
             visit = c["admission_date"] or c["surgery_date"]
             fasting = (c["preop"] or {}).get("fasting_from")
             sent.append(whatsapp.notify(ctx.db, c["patient_id"], "reminder", ctx.actor, visit_date=visit, visit_time="07:00",
-                                        purpose=f"Admission for surgery ({c['procedure_planned']})" + (f". Nothing to eat or drink from {fasting}" if fasting else "")))
+                                        purpose=f"Admission for surgery ({c['procedure_planned']})" + (f". Nothing to eat or drink from {fasting}" if fasting else ""),
+                                        reminder_key=f"surgery:{c['id']}"))
         data["whatsapp"] = sent
     return data
 
@@ -177,7 +180,8 @@ def _sx_discharge(ctx: Ctx, case_id: int) -> dict[str, Any]:
     fu = (data["case"]["discharge"] or {}).get("follow_up_date")
     if body.get("notify_whatsapp") and fu:
         data["whatsapp"] = [whatsapp.notify(ctx.db, data["case"]["patient_id"], "reminder", ctx.actor, visit_date=fu, visit_time="10:00",
-                                            purpose="Review after surgery (wound check" + (", drain" if (data["case"]["discharge"] or {}).get("drains_at_discharge") else "") + ")")]
+                                            purpose="Review after surgery (wound check" + (", drain" if (data["case"]["discharge"] or {}).get("drains_at_discharge") else "") + ")",
+                                            reminder_key=f"surgery-follow-up:{case_id}")]
     return data
 
 
@@ -213,7 +217,7 @@ def _finalise_notify(ctx: Ctx, summary_id: int) -> dict[str, Any]:
         fu = content.get("follow_up") or {}
         if fu.get("date"):
             sent.append(whatsapp.notify(ctx.db, pid, "reminder", ctx.actor, visit_date=fu["date"], visit_time="10:00",
-                                        purpose=f"Follow-up{' with ' + fu['with'] if fu.get('with') else ''}"))
+                                        purpose=f"Follow-up{' with ' + fu['with'] if fu.get('with') else ''}", reminder_key=f"summary-follow-up:{pid}:{data['kind']}"))
         data["whatsapp"] = sent
     return data
 

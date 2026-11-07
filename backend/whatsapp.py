@@ -393,8 +393,8 @@ def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> di
             plan = _plan_text(connection, patient, lang)
             body = f"Hello {name}, here is your treatment plan from {clinic()}:\n\n{plan}\n\nReply to this message if you have symptoms or questions. In an emergency call 112."
             params = [name, clinic(), _one_line(plan)]
-        elif kind == "prescription" and (payload.get("prescription_id") or not payload.get("summary_id")) and \
-                row_or_none(connection, "SELECT 1 FROM prescriptions WHERE patient_id = ? AND status = 'active'", (patient_id,)):
+        elif kind == "prescription" and (payload.get("prescription_id") or (not payload.get("summary_id") and
+                row_or_none(connection, "SELECT 1 FROM prescriptions WHERE patient_id = ? AND status = 'active'", (patient_id,)))):
             rx_row = row_or_none(connection, "SELECT * FROM prescriptions WHERE id = ? AND patient_id = ? AND status = 'active'",
                                  (payload.get("prescription_id"), patient_id)) if payload.get("prescription_id") else None
             rx = prescriptions._view(rx_row) if rx_row else prescriptions.latest_active(connection, patient_id)
@@ -464,6 +464,8 @@ def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> di
                     scheduled = None  # the day-before time has passed: send now
             related_type = "visit"
             meta = {"visit_date": visit_day.isoformat(), "visit_time": time_text or None, "purpose": purpose or None}
+            if payload.get("reminder_key"):  # which visit this is (e.g. a chemo cycle), so a moved or cancelled visit's reminder can be withdrawn
+                meta["key"] = str(payload["reminder_key"])[:80]
         elif kind == "document":
             doc = row_or_none(connection, "SELECT * FROM patient_documents WHERE id = ? AND patient_id = ?", (payload.get("document_id"), patient_id))
             if not doc:
@@ -1482,9 +1484,26 @@ def _booked_lines(connection: sqlite3.Connection, patient_id: int) -> list[str]:
 
 
 # ---------------------------------------------------------------------------------------------- doctor actions -> WhatsApp
+def cancel_reminders(db: str, patient_id: int, keys: Any) -> int:
+    """Withdraw scheduled (not yet sent) visit reminders for visits that moved, were held or called off, matched by the
+    reminder_key notify() stored with them. Returns how many were cancelled."""
+    wanted = {str(k) for k in keys or [] if k}
+    if not wanted:
+        return 0
+    with transaction(db) as connection:
+        stale = [r["id"] for r in rows(connection, "SELECT id, meta_json FROM whatsapp_messages WHERE patient_id = ? AND kind = 'reminder' AND status = 'scheduled'",
+                                       (patient_id,)) if (json.loads(r["meta_json"] or "null") or {}).get("key") in wanted]
+        for message_id in stale:
+            connection.execute("UPDATE whatsapp_messages SET status = 'cancelled', updated_at = ? WHERE id = ? AND status = 'scheduled'", (utc_now(), message_id))
+    return len(stale)
+
+
 def notify(db: str, patient_id: int, kind: str, actor: str, **payload: Any) -> dict[str, Any]:
     """Send what the doctor just did in the app (plan, prescription, summary, reminder). The doctor's action is the approval.
-    Returns {kind, status, ...}; 'skipped' with a reason when the patient has not opted in or there is nothing to send."""
+    Returns {kind, status, ...}; 'skipped' with a reason when the patient has not opted in or there is nothing to send.
+    A reminder with a reminder_key replaces the still-scheduled reminder for the same visit (e.g. the cycle was delayed)."""
+    if kind == "reminder" and payload.get("reminder_key"):
+        cancel_reminders(db, patient_id, [payload["reminder_key"]])
     with transaction(db) as connection:
         patient = row_or_none(connection, "SELECT phone, wa_opt_in FROM patients WHERE id = ?", (patient_id,))
     if not patient or not patient["phone"]:
