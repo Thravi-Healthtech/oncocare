@@ -364,6 +364,18 @@ def _parse_send_at(value: Any) -> str | None:
     return when.astimezone(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def _attach_pdf(connection: sqlite3.Connection, kind: str, record_id: int) -> dict[str, Any] | None:
+    """Make the PDF the patient receives for a discharge summary or prescription. The file is kept with the message, so
+    what was sent stays on record even if the source is revised later. None (send as text) if it cannot be made."""
+    from . import pdfs
+    try:
+        data, filename = (pdfs.discharge_pdf if kind == "discharge" else pdfs.prescription_pdf)(connection, record_id)
+        path = pdfs.save(data, (MEDIA_DIR or Path("uploads") / "whatsapp") / "documents", f"{kind}-{record_id}-{uuid.uuid4().hex[:8]}")
+    except Exception:  # noqa: BLE001 - a broken PDF must not stop the message itself
+        return None
+    return {"pdf_path": str(path), "filename": filename, "content_type": "application/pdf", "template": "document"}
+
+
 def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> dict[str, Any]:
     kind = payload.get("kind")
     if kind not in ("plan", "prescription", "discharge", "reminder", "document", "message"):
@@ -395,6 +407,11 @@ def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> di
                     "\n\nTake them as advised and reply here if you have questions.")
             params = [name, doctor, _one_line(_medicines_text(meds) + (f"; Advice: {rx['advice']}" if rx.get("advice") else ""))]
             related_type, related_id = "prescription", rx["id"]
+            meta = _attach_pdf(connection, "prescription", rx["id"])
+            if meta:  # sent as a PDF document; the medicines stay in the caption
+                body = (f"Hello {name}, here is your prescription from {doctor} ({_fmt_day(rx['rx_date'])}), attached as a PDF.\n\n"
+                        f"{_medicines_text(meds)}{advice}\n\nTake them as advised and reply here if you have questions.")
+                params = [name, clinic(), f"Prescription from {doctor} ({_fmt_day(rx['rx_date'])})"]
         elif kind == "prescription":
             summary = _final_summary(connection, patient_id, payload.get("summary_id"))
             content = json.loads(summary["content_json"])
@@ -415,6 +432,10 @@ def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> di
                     f"or ask us for a printed copy.{follow}")
             params = [name, title, clinic(), portal_url()]
             related_type, related_id = "discharge_summary", summary["id"]
+            meta = _attach_pdf(connection, "discharge", summary["id"])
+            if meta:
+                body = f"Hello {name}, your {title} from {clinic()} is attached as a PDF.{follow}\n\nReply here if you have questions about it."
+                params = [name, clinic(), f"{content.get('title') or 'Discharge summary'} ({_fmt_day((summary['finalised_at'] or '')[:10])})"]
         elif kind == "reminder":
             visit = payload.get("visit_date")
             try:
@@ -459,7 +480,7 @@ def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> di
             if not text:
                 raise ApiError(422, "Write the message", {"fields": ["text"]})
             body = text[:3500]
-        message_id = _store(connection, patient_id, "out", kind, body, "draft", template_name=TEMPLATES.get(kind, {}).get("name"),
+        message_id = _store(connection, patient_id, "out", kind, body, "draft", template_name=TEMPLATES.get((meta or {}).get("template") or kind, {}).get("name"),
                             template_params_json=json.dumps(params) if params else None, related_type=related_type, related_id=related_id,
                             scheduled_for=scheduled, meta_json=json.dumps(meta) if meta else None)
         if kind == "reminder":  # the buttons carry this reminder's id so the patient's answer books the right visit
@@ -550,21 +571,30 @@ def _graph(path: str, body: dict[str, Any] | None = None, method: str = "POST", 
         raise RuntimeError(f"Cannot reach graph.facebook.com ({error.reason})") from None
 
 
-def _send_live(connection: sqlite3.Connection, msg: dict[str, Any], patient: dict[str, Any]) -> str:
+def _live_plan(connection: sqlite3.Connection, msg: dict[str, Any], patient: dict[str, Any]) -> dict[str, Any]:
+    """Build the Graph API request for one outbound message using only the database (no network).
+    A document's media id is filled in by _send_plan, after the transaction has closed."""
     to = wa_number(patient["phone"])
     if not to:
         raise RuntimeError("The patient has no valid mobile number")
     meta = json.loads(msg.get("meta_json") or "null") or {}
     buttons = json.loads(msg.get("buttons_json") or "null") or []
-    document = None
+    document = doc_file = None
     if msg["kind"] == "document":
         doc = row_or_none(connection, "SELECT * FROM patient_documents WHERE id = ?", (meta.get("document_id"),))
         if not doc or not Path(doc["stored_path"]).exists():
             raise RuntimeError("The document file is missing")
-        document = {"id": _upload_media_live(Path(doc["stored_path"]), doc["content_type"] or "application/pdf"), "filename": doc["filename"]}
+        document = {"filename": doc["filename"]}  # "id" is added once the file is uploaded to WhatsApp
+        doc_file = (Path(doc["stored_path"]), doc["content_type"] or "application/pdf")
+    elif meta.get("pdf_path"):  # discharge summary / prescription made into a PDF when the message was composed
+        if not Path(meta["pdf_path"]).exists():
+            raise RuntimeError("The PDF for this message is missing; compose it again")
+        document = {"filename": meta.get("filename") or "document.pdf"}
+        doc_file = (Path(meta["pdf_path"]), "application/pdf")
     if window_open(connection, patient["id"]):
         if document:
-            body = {"messaging_product": "whatsapp", "to": to, "type": "document", "document": {**document, "caption": msg["body"][:1024]}}
+            document["caption"] = msg["body"][:1024]
+            body = {"messaging_product": "whatsapp", "to": to, "type": "document", "document": document}
         elif buttons:
             body = {"messaging_product": "whatsapp", "to": to, "type": "interactive",
                     "interactive": {"type": "button", "body": {"text": msg["body"][:1024]},
@@ -572,7 +602,7 @@ def _send_live(connection: sqlite3.Connection, msg: dict[str, Any], patient: dic
         else:
             body = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"body": msg["body"][:4096], "preview_url": True}}
     else:
-        template = TEMPLATES.get(msg["kind"])
+        template = TEMPLATES.get(meta.get("template") or msg["kind"])
         if not template or not msg["template_params_json"]:
             raise RuntimeError("More than 24 hours since the patient's last message; this message type has no approved template")
         if document and not str(meta.get("content_type") or "").endswith("pdf"):
@@ -585,23 +615,56 @@ def _send_live(connection: sqlite3.Connection, msg: dict[str, Any], patient: dic
             components.append({"type": "button", "sub_type": "quick_reply", "index": str(index), "parameters": [{"type": "payload", "payload": button["id"]}]})
         body = {"messaging_product": "whatsapp", "to": to, "type": "template",
                 "template": {"name": template["name"], "language": {"code": _env("WHATSAPP_TEMPLATE_LANG", "en")}, "components": components}}
-    reply = _graph(f"{_env('WHATSAPP_PHONE_NUMBER_ID')}/messages", body)
+    return {"body": body, "document": document, "doc_file": doc_file}
+
+
+def _send_plan(plan: dict[str, Any]) -> str:
+    """Network part of a send: upload the document (if any), then post the message. Never call inside a transaction."""
+    if plan["doc_file"]:
+        plan["document"]["id"] = _upload_media_live(*plan["doc_file"])
+    reply = _graph(f"{_env('WHATSAPP_PHONE_NUMBER_ID')}/messages", plan["body"])
     return (reply.get("messages") or [{}])[0].get("id") or ""
 
 
+def _send_live(connection: sqlite3.Connection, msg: dict[str, Any], patient: dict[str, Any]) -> str:
+    return _send_plan(_live_plan(connection, msg, patient))
+
+
 def deliver(db: str, message_id: int) -> dict[str, Any]:
-    """Send one approved outbound message now (simulator: mark as sent)."""
+    """Send one approved outbound message now (simulator: mark as sent).
+
+    The WhatsApp calls run with no transaction open. Holding one across them broke live sends: the Graph call takes a
+    second, the webhook's status update for an earlier message committed meanwhile, and SQLite (WAL, deferred BEGIN)
+    then refused this transaction's write, so the request failed with 500 after the patient had already got the message.
+    The message is first claimed (draft/scheduled -> sending) so that a double click or the scheduler cannot send it twice."""
+    channel = mode()
+    plan, error = None, None
     with transaction(db) as connection:
         msg = row_or_none(connection, "SELECT * FROM whatsapp_messages WHERE id = ?", (message_id,))
-        patient = _patient(connection, msg["patient_id"])
-        channel = mode()
+        if not msg:
+            raise ApiError(404, "Message not found")
+        claimed = connection.execute("UPDATE whatsapp_messages SET status = 'sending', updated_at = ? WHERE id = ? AND status IN ('draft', 'scheduled')",
+                                     (utc_now(), message_id)).rowcount
+        if not claimed:
+            return _message(connection, message_id)  # already being sent (or sent) by another request
+        if channel == "live":
+            try:
+                plan = _live_plan(connection, msg, _patient(connection, msg["patient_id"]))
+            except Exception as failure:
+                error = str(failure)
+    wamid = f"sim-{message_id}"
+    if plan:
         try:
-            wamid = _send_live(connection, msg, patient) if channel == "live" else f"sim-{message_id}"
+            wamid = _send_plan(plan)
+        except Exception as failure:
+            error = str(failure)
+    with transaction(db) as connection:
+        if error is None:
             connection.execute("UPDATE whatsapp_messages SET status = 'sent', channel = ?, wa_message_id = ?, error = NULL, sent_at = ?, updated_at = ? WHERE id = ?",
                                (channel, wamid, utc_now(), utc_now(), message_id))
-        except Exception as error:
+        else:
             connection.execute("UPDATE whatsapp_messages SET status = 'failed', channel = ?, error = ?, updated_at = ? WHERE id = ?",
-                               (channel, str(error)[:300], utc_now(), message_id))
+                               (channel, error[:300], utc_now(), message_id))
         return _message(connection, message_id)
 
 
@@ -654,29 +717,57 @@ def _bot(connection: sqlite3.Connection, patient_id: int | None, body: str, kind
                         meta_json=json.dumps(meta, ensure_ascii=False) if meta else None,
                         media_path=media[0] if media else None, media_type=media[1] if media else None)
     if mode() == "live":
-        to = wa_from
-        if not to and patient_id:
-            to = wa_number((row_or_none(connection, "SELECT phone FROM patients WHERE id = ?", (patient_id,)) or {}).get("phone"))
-        try:
-            if buttons:
-                payload = {"messaging_product": "whatsapp", "to": to, "type": "interactive",
-                           "interactive": {"type": "button", "body": {"text": body[:1024]},
-                                           "action": {"buttons": [{"type": "reply", "reply": {"id": b["id"], "title": b["title"][:20]}} for b in buttons[:3]]}}}
-            else:
-                payload = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"body": body[:4096]}}
-            reply = _graph(f"{_env('WHATSAPP_PHONE_NUMBER_ID')}/messages", payload)
-            wamid = (reply.get("messages") or [{}])[0].get("id")
-            if media:
-                media_id = _upload_media_live(Path(media[0]), media[1])
-                _graph(f"{_env('WHATSAPP_PHONE_NUMBER_ID')}/messages", {"messaging_product": "whatsapp", "to": to, "type": "audio", "audio": {"id": media_id}})
-            connection.execute("UPDATE whatsapp_messages SET status = 'sent', wa_message_id = ?, sent_at = ?, updated_at = ? WHERE id = ?",
-                               (wamid, utc_now(), utc_now(), message_id))
-        except Exception as error:
-            connection.execute("UPDATE whatsapp_messages SET status = 'failed', error = ?, updated_at = ? WHERE id = ?", (str(error)[:300], utc_now(), message_id))
+        # Queued, not sent here: this runs inside the caller's transaction, and a WhatsApp call must not hold the
+        # database. receive() / run_due() send the queue once their transaction has committed (send_queued).
+        connection.execute("UPDATE whatsapp_messages SET status = 'queued', updated_at = ? WHERE id = ?", (utc_now(), message_id))
     else:
         connection.execute("UPDATE whatsapp_messages SET status = 'sent', wa_message_id = ?, sent_at = ?, updated_at = ? WHERE id = ?",
                            (f"sim-{message_id}", utc_now(), utc_now(), message_id))
     return message_id
+
+
+def _send_bot(db: str, message_id: int) -> None:
+    """Send one queued automatic reply (text or reply buttons, plus a spoken copy when one was made)."""
+    with transaction(db) as connection:
+        if not connection.execute("UPDATE whatsapp_messages SET status = 'sending', updated_at = ? WHERE id = ? AND status = 'queued'",
+                                  (utc_now(), message_id)).rowcount:
+            return  # another thread is sending it
+        msg = row_or_none(connection, "SELECT * FROM whatsapp_messages WHERE id = ?", (message_id,))
+        to = msg["wa_from"]
+        if not to and msg["patient_id"]:
+            to = wa_number((row_or_none(connection, "SELECT phone FROM patients WHERE id = ?", (msg["patient_id"],)) or {}).get("phone"))
+    body = msg["body"]
+    buttons = json.loads(msg.get("buttons_json") or "null") or []
+    wamid, error = None, None
+    try:
+        if buttons:
+            payload = {"messaging_product": "whatsapp", "to": to, "type": "interactive",
+                       "interactive": {"type": "button", "body": {"text": body[:1024]},
+                                       "action": {"buttons": [{"type": "reply", "reply": {"id": b["id"], "title": b["title"][:20]}} for b in buttons[:3]]}}}
+        else:
+            payload = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"body": body[:4096]}}
+        reply = _graph(f"{_env('WHATSAPP_PHONE_NUMBER_ID')}/messages", payload)
+        wamid = (reply.get("messages") or [{}])[0].get("id")
+        if msg.get("media_path") and Path(msg["media_path"]).exists():
+            media_id = _upload_media_live(Path(msg["media_path"]), msg.get("media_type") or "audio/mpeg")
+            _graph(f"{_env('WHATSAPP_PHONE_NUMBER_ID')}/messages", {"messaging_product": "whatsapp", "to": to, "type": "audio", "audio": {"id": media_id}})
+    except Exception as failure:
+        error = str(failure)[:300]
+    with transaction(db) as connection:
+        if wamid:  # the text went out; a failed spoken copy is only noted
+            connection.execute("UPDATE whatsapp_messages SET status = 'sent', wa_message_id = ?, error = ?, sent_at = ?, updated_at = ? WHERE id = ?",
+                               (wamid, error, utc_now(), utc_now(), message_id))
+        else:
+            connection.execute("UPDATE whatsapp_messages SET status = 'failed', error = ?, updated_at = ? WHERE id = ?", (error, utc_now(), message_id))
+
+
+def send_queued(db: str) -> int:
+    """Send automatic replies queued by _bot, oldest first, after the transaction that created them has committed."""
+    with transaction(db) as connection:
+        ids = [r["id"] for r in rows(connection, "SELECT id FROM whatsapp_messages WHERE status = 'queued' ORDER BY id")]
+    for message_id in ids:
+        _send_bot(db, message_id)
+    return len(ids)
 
 
 def send_report_reply(db: str, report_id: int, actor: str, upload_dir: Path | None = None) -> dict[str, Any] | None:
@@ -708,6 +799,8 @@ def run_due(db: str) -> dict[str, int]:
             if session:
                 _submit(connection, db, patient_id, session, None, partial=True)
                 closed += 1
+    if mode() == "live":
+        send_queued(db)
     return {"sent": sent, "closed": closed}
 
 
@@ -737,6 +830,8 @@ def _message(connection: sqlite3.Connection, message_id: int) -> dict[str, Any]:
                                                     "voice": "Voice note", "command": "Patient command"}.get(msg["kind"], msg["kind"]))
     msg["template_params"] = json.loads(msg.pop("template_params_json") or "null")
     msg["meta"] = json.loads(msg.pop("meta_json") or "null")
+    if isinstance(msg["meta"], dict):
+        msg["meta"].pop("pdf_path", None)
     msg["buttons"] = json.loads(msg.pop("buttons_json") or "null")
     msg["has_audio"] = bool(msg["media_path"])
     msg.pop("media_path", None)
@@ -991,7 +1086,16 @@ def _transcribe(audio: tuple[bytes, str], client_transcript: str | None) -> tupl
 def receive(db: str, wa_from: str, text: str | None = None, audio: tuple[bytes, str] | None = None, upload_dir: Path | None = None,
             wa_message_id: str | None = None, channel: str | None = None, button_id: str | None = None,
             client_transcript: str | None = None) -> dict[str, Any]:
-    """Handle one inbound WhatsApp message (from the webhook or the simulator)."""
+    """Handle one inbound WhatsApp message (from the webhook or the simulator); live replies go out after it is saved."""
+    try:
+        return _receive(db, wa_from, text, audio, upload_dir, wa_message_id, channel, button_id, client_transcript)
+    finally:
+        if mode() == "live":
+            send_queued(db)
+
+
+def _receive(db: str, wa_from: str, text: str | None, audio: tuple[bytes, str] | None, upload_dir: Path | None,
+             wa_message_id: str | None, channel: str | None, button_id: str | None, client_transcript: str | None) -> dict[str, Any]:
     text = (text or "").strip()[:4000]
     digits = normalise_phone(wa_from)
     transcript_method = None

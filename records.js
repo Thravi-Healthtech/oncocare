@@ -234,7 +234,7 @@ function renderDischarge() {
   $("#dischargeEyebrow").textContent = `${ds.kind_label} · version ${ds.version}`;
   $("#dischargeTitle").innerHTML = `${esc(c.title)} ${dsPill(ds.status)}`;
   $("#dischargeSubtitle").textContent = `${p.first_name} ${p.last_name} · ${p.medical_record_number} · ${fmtDate(ds.period_from)} to ${fmtDate(ds.period_to)}`;
-  $("#dischargeActions").innerHTML = `<a class="button secondary" href="/api/discharge-summaries/${ds.id}/print" target="_blank" rel="noopener">Print / PDF</a>
+  $("#dischargeActions").innerHTML = `<a class="button secondary" href="/api/discharge-summaries/${ds.id}/print" target="_blank" rel="noopener">Print</a>${ds.status === "final" ? ` <a class="button secondary" href="/api/discharge-summaries/${ds.id}/pdf" target="_blank" rel="noopener">PDF</a>` : ""}
     ${locked ? `${ds.status === "final" ? `<button class="button secondary" data-rec="revise">New version</button><button class="button primary" data-wa-share="discharge" data-summary="${ds.id}">Share on WhatsApp</button>` : ""}`
       : `<button class="button secondary" data-rec="regenerate">Rebuild from record</button><button class="button danger-outline" data-rec="delete-draft">Delete draft</button><button class="button primary" data-rec="finalise">Review &amp; finalise</button>`}`;
   const course = c.course || {};

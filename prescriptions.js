@@ -18,7 +18,7 @@ EXT.patientPanels.push(p => {
         <small>${rx.items.map(m => esc([m.name, m.dose, m.frequency, m.duration ? `for ${m.duration}` : ""].filter(Boolean).join(" "))).join(" · ")}</small>
         <small class="muted">${esc(rx.prescribed_by)}${rx.source === "conversation" ? " · drafted from the consultation" : ""}${rx.indication ? ` · ${esc(rx.indication)}` : ""}${rx.status === "cancelled" ? ` · cancelled: ${esc(rx.cancel_reason || "")}` : ""}</small>
         ${rx.consult_notes || rx.transcript ? `<details class="rx-notes"><summary>Consultation notes</summary>${rx.consult_notes ? `<p>${esc(rx.consult_notes)}</p>` : ""}${rx.transcript ? `<p class="muted small"><strong>Transcript:</strong> ${esc(rx.transcript)}</p>` : ""}</details>` : ""}</div>
-        <div class="plan-row-actions"><a class="button secondary small" href="/api/prescriptions/${rx.id}/print" target="_blank" rel="noopener">Print / PDF</a>
+        <div class="plan-row-actions"><a class="button secondary small" href="/api/prescriptions/${rx.id}/print" target="_blank" rel="noopener">Print</a><a class="button secondary small" href="/api/prescriptions/${rx.id}/pdf" target="_blank" rel="noopener">PDF</a>
         ${rx.status === "active" ? `${p.phone ? `<button class="button secondary small" data-wa-share="prescription" data-patient="${p.id}" data-prescription="${rx.id}">Send on WhatsApp</button>` : ""}
           <button class="text-button" data-rx="cancel" data-id="${rx.id}" data-patient="${p.id}">Cancel</button>` : ""}</div></div>`).join("")
       : '<div class="queue-empty">No prescriptions yet. Write one at any visit — for example anti-sickness medicines on a chemo day or a mouthwash between cycles.</div>'}

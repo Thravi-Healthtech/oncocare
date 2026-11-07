@@ -58,7 +58,7 @@ function updateWaBadge() {
 /* ------------------------------------------------------------------ render */
 function tick(m) {
   if (m.direction === "in") return "";
-  return { draft: '<span class="tick">draft</span>', scheduled: `<span class="tick">🕑 ${fmtDateTime(m.scheduled_for)}</span>`, sent: '<span class="tick">✓</span>', delivered: '<span class="tick">✓✓</span>',
+  return { draft: '<span class="tick">draft</span>', queued: '<span class="tick">🕑</span>', sending: '<span class="tick">🕑</span>', scheduled: `<span class="tick">🕑 ${fmtDateTime(m.scheduled_for)}</span>`, sent: '<span class="tick">✓</span>', delivered: '<span class="tick">✓✓</span>',
     read: '<span class="tick read">✓✓</span>', failed: `<span class="tick fail" title="${esc(m.error || "")}">✗ failed</span>`, cancelled: '<span class="tick">cancelled</span>' }[m.status] || "";
 }
 const VOICE_LANG = { en: "en-IN", hi: "hi-IN", te: "te-IN" };
@@ -76,7 +76,7 @@ function bubble(m) {
   const buttons = m.buttons?.length ? `<div class="wa-buttons">${m.buttons.map(b => `<button type="button" data-wa="button" data-id="${esc(b.id)}">${esc(b.title)}</button>`).join("")}</div>` : "";
   return `<div class="wa-msg ${out ? "out" : "in"} ${m.kind === "bot" || m.kind === "agent" ? "bot" : ""} ${m.kind === "agent" ? "agent" : ""} ${["scheduled", "cancelled", "failed"].includes(m.status) ? m.status : ""}" data-msg="${m.id}">
     ${label ? `<small class="wa-label" ${meta.note ? `title="${esc(meta.note)}"` : ""}>${esc(label)}</small>` : ""}
-    ${audio}<div class="wa-text">${body}</div>${listen}
+    ${out && meta.filename ? `<small class="wa-label">📄 ${esc(meta.filename)}</small>` : ""}${audio}<div class="wa-text">${body}</div>${listen}
     <div class="wa-meta">${m.report_id && !out ? `<a href="#inbox" class="wa-link">in inbox</a>` : ""}<span>${new Date(m.sent_at || m.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>${tick(m)}</div>
     ${m.status === "scheduled" ? `<button class="text-button small" data-wa="cancel" data-message="${m.id}">Cancel</button>` : ""}
   </div>${buttons}`;
@@ -208,7 +208,7 @@ async function composeNow(extra) {
   const scheduled = draft.scheduled_for && draft.scheduled_for > new Date().toISOString();
   waModal(`${WA_KIND[c.kind]} · review before sending`, `To ${p.first_name} ${p.last_name} · +${p.wa_number}`, `
     ${draft.checks.map(ch => `<p class="${ch.severity === "alert" ? "check-alert" : "safety-banner"}">${esc(ch.text)}${ch.severity === "alert" && !p.wa_opt_in ? ` <button type="button" class="text-button" data-wa="consent" data-patient="${p.id}">Turn on</button>` : ""}</p>`).join("")}
-    <div class="wa-preview"><div class="wa-msg out">${c.kind === "document" ? `<small class="wa-label">📄 ${esc(draft.meta?.filename || "document")} attached</small>` : ""}<div class="wa-text" id="waPreviewText">${esc(draft.body)}</div></div>${draft.buttons?.length ? `<div class="wa-buttons">${draft.buttons.map(b => `<button type="button" disabled>${esc(b.title)}</button>`).join("")}</div>` : ""}</div>
+    <div class="wa-preview"><div class="wa-msg out">${draft.meta?.filename ? `<small class="wa-label">📄 ${esc(draft.meta.filename)} attached</small>` : ""}<div class="wa-text" id="waPreviewText">${esc(draft.body)}</div></div>${draft.buttons?.length ? `<div class="wa-buttons">${draft.buttons.map(b => `<button type="button" disabled>${esc(b.title)}</button>`).join("")}</div>` : ""}</div>
     <label class="field"><span>Message (you can edit before approving)</span><textarea name="body" rows="9" maxlength="3500">${esc(draft.body)}</textarea></label>
     ${scheduled ? `<p class="muted">Will be sent on <strong>${fmtDateTime(draft.scheduled_for)}</strong>.</p>` : ""}
     ${draft.template_name ? `<p class="muted small">Outside the 24-hour window, live mode sends the approved template <code>${esc(draft.template_name)}</code> with these details on one line.</p>` : ""}

@@ -19,7 +19,7 @@ os.environ.pop("WHATSAPP_MODE", None)
 
 from backend import whatsapp  # noqa: E402
 from backend.api import make_handler  # noqa: E402
-from backend.database import migrate, seed_demo, transaction  # noqa: E402
+from backend.database import connect, migrate, seed_demo, transaction  # noqa: E402
 from backend import radiotherapy as rt  # noqa: E402
 
 whatsapp.SYNC_TRIAGE = True
@@ -395,6 +395,41 @@ class WhatsAppTests(Base):
         header = sent_bodies[0]["template"]["components"][0]
         self.assertEqual((sent_bodies[0]["template"]["name"], header["type"], header["parameters"][0]["document"]),
                          ("oncocare_document", "header", {"id": "media-1", "filename": "scan.pdf"}))
+
+    def test_live_send_survives_webhook_write_during_graph_call(self) -> None:
+        """Regression (7 Nov, live): while a send waited on the Graph API, the webhook committed a status update; the send's
+        own transaction could then not write ("database is locked"), so the request failed with 500 although WhatsApp had
+        delivered the message, and the message stayed a draft. Bot replies must also go out only after the inbound is saved."""
+        def graph(path, body=None, **kwargs):
+            other = connect(self.db)  # what the webhook thread does meanwhile
+            other.execute("UPDATE patients SET updated_at = ? WHERE id = ?", (f"2026-01-01T00:00:{len(calls):02d}+00:00", self.pid))
+            other.commit()
+            other.close()
+            calls.append(body)
+            return {"messages": [{"id": f"wamid.{len(calls)}"}]}
+
+        calls: list = []
+        visit = (date.today() + timedelta(days=4)).isoformat()
+        _, draft = self.call("POST", f"/api/patients/{self.pid}/whatsapp/compose", {"kind": "reminder", "visit_date": visit, "send_now": True})
+        live = {"WHATSAPP_MODE": "live", "WHATSAPP_TOKEN": "t", "WHATSAPP_PHONE_NUMBER_ID": "1"}
+        with mock.patch.dict(os.environ, live), mock.patch.object(whatsapp, "_graph", side_effect=graph):
+            status, sent = self.call("POST", f"/api/whatsapp/messages/{draft['data']['id']}/send", {})
+            self.assertEqual((status, sent["data"]["status"], sent["data"]["wa_message_id"]), (200, "sent", "wamid.1"), sent)
+            # Sending it again is refused, not repeated.
+            self.assertEqual(self.call("POST", f"/api/whatsapp/messages/{draft['data']['id']}/send", {})[0], 409)
+            self.assertEqual(whatsapp.deliver(str(self.db), draft["data"]["id"])["status"], "sent")
+            self.assertEqual(len(calls), 1)
+            # The patient taps Confirm: the booking is saved and the bot's answer is sent after it.
+            event = {"entry": [{"changes": [{"value": {"metadata": {"phone_number_id": "1"}, "messages": [{"from": "91" + self.phone, "id": "wamid.TAP2", "type": "button",
+                                                                     "button": {"payload": f"visit_yes:{draft['data']['id']}", "text": "Confirm visit"}}]}}]}]}
+            self.assertEqual(self.call("POST", "/api/whatsapp/webhook", event)[0], 200)
+        _, appts = self.call("GET", f"/api/patients/{self.pid}/appointments")
+        self.assertIn((visit, "booked"), [(a["appt_date"], a["status"]) for a in appts["data"]])
+        with transaction(self.db) as connection:
+            replies = connection.execute("SELECT status, wa_message_id FROM whatsapp_messages WHERE patient_id = ? AND kind = 'bot' ORDER BY id DESC LIMIT 1",
+                                         (self.pid,)).fetchall()
+        self.assertEqual(replies[0]["status"], "sent")
+        self.assertEqual(len(calls), 2)
 
     def test_red_flag_message_creates_report_and_emergency_reply(self) -> None:
         result = self.say("I have high fever and chills since morning")
