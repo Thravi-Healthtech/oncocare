@@ -1427,7 +1427,8 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             pages = {"": "home.html", "/": "home.html", "/clinician": "index.html", "/clinician/": "index.html", "/portal": "portal.html", "/portal/": "portal.html"}
             relative = pages.get(request_path, request_path.lstrip("/"))
             if relative not in {"home.html", "home.css", "index.html", "app.js", "styles.css", "favicon.ico", "portal.html", "portal.js", "portal.css",
-                                "rt.js", "surgery.js", "records.js", "whatsapp.js", "prescriptions.js", "oncology.js"}:
+                                "rt.js", "surgery.js", "records.js", "whatsapp.js", "prescriptions.js", "oncology.js",
+                                "thravi-mark.png", "favicon.png", "fonts/fonts.css"} and not re.fullmatch(r"fonts/[a-z0-9-]+\.woff2", relative):
                 return self._json(404, {"error": {"message": "Not found"}})
             target = (web_root / relative).resolve()
             if web_root not in target.parents and target != web_root:
@@ -1442,9 +1443,11 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                 if match:
                     content = content[:match.end()] + banner + content[match.end():]
             self.send_response(200)
-            self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
+            content_type = "font/woff2" if target.suffix == ".woff2" else mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(content)))
-            self.send_header("Cache-Control", "no-cache")
+            # Font files never change under the same name; everything else revalidates on each load.
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable" if target.suffix == ".woff2" else "no-cache")
             self.end_headers()
             self.wfile.write(content)
 

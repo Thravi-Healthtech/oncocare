@@ -64,7 +64,7 @@ function oncChart(o) {
   const y = v => T + (1 - v / max) * (H - T - B);
   const pr = base * 0.7;
   const ticks = [0, max / 2, max].map(v => Math.round(v));
-  const color = r => ({ CR: "#2f6a47", PR: "#2f6a47", SD: "#0e6e6a", PD: "#b03a2e" }[r] || "#667879");
+  const color = r => ({ CR: "#2f6a47", PR: "#2f6a47", SD: "#294b7a", PD: "#b03a2e" }[r] || "#5b6b80");
   return `<figure class="onc-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Sum of target lesion diameters over time">
       ${ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join("")}
       <line x1="${L}" x2="${W - R}" y1="${y(base)}" y2="${y(base)}" class="base"/><text x="${W - R}" y="${y(base) - 5}" text-anchor="end" class="lbl">baseline</text>

@@ -6,16 +6,15 @@
     <meta name="description" content="Thravi OncoCare patient portal" />
     <meta name="theme-color" content="#123d3b" />
     <title>My Care · Thravi OncoCare</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/fonts/fonts.css" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="stylesheet" href="/portal.css" />
   </head>
   <body>
     <!-- Sign in -->
     <main id="loginView" class="login-view" hidden>
       <div class="login-card">
-        <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="9" /></svg></span><span><strong>Thravi</strong><small>My care</small></span></div>
+        <div class="brand"><img class="brand-mark" src="/thravi-mark.png" alt="" width="42" height="40" /><span><strong>Thravi</strong><small>My care</small></span></div>
         <h1>Welcome</h1>
         <p class="muted">Sign in with the mobile number registered with your hospital.</p>
         <form id="loginForm" novalidate>
@@ -32,7 +31,7 @@
     <!-- App -->
     <div id="appView" class="app" hidden>
       <header class="top">
-        <div class="brand small"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="9" /></svg></span><span><strong>Thravi</strong><small>My care</small></span></div>
+        <div class="brand small"><img class="brand-mark" src="/thravi-mark.png" alt="" width="42" height="40" /><span><strong>Thravi</strong><small>My care</small></span></div>
         <div class="who"><strong id="patientName"></strong><small id="patientMrn"></small></div>
         <button class="link-button" id="signOut" type="button">Sign out</button>
       </header>

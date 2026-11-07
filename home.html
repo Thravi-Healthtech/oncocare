@@ -4,11 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Thravi OncoCare (beta): assistive AI that brings medical, surgical and radiation oncology into one record for oncology teams and their patients." />
-    <meta name="theme-color" content="#123d3b" />
+    <meta name="theme-color" content="#294b7a" />
     <title>Thravi OncoCare · Beta</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/fonts/fonts.css" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="stylesheet" href="/home.css" />
   </head>
   <body>
@@ -23,8 +22,8 @@
     <header class="nav">
       <div class="wrap nav-inner">
         <a class="brand" href="/" aria-label="Thravi OncoCare home">
-          <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="9" /></svg></span>
-          <span><strong>Thravi</strong><small>OncoCare <em>beta</em></small></span>
+          <img class="brand-mark" src="/thravi-mark.png" alt="" width="42" height="40" />
+          <span><strong>Thravi</strong><small>OncoCare · <em>Beta</em></small></span>
         </a>
         <nav class="nav-links" aria-label="Page sections">
           <a href="#workflows">Workflows</a>
@@ -46,7 +45,7 @@
         <div class="wrap hero-grid">
           <div class="hero-copy">
             <p class="eyebrow">Assistive AI for cancer care</p>
-            <h1>One record for every cancer patient, across every treatment.</h1>
+            <h1>One record for every cancer patient, across <span class="hl-underline">every treatment.<svg viewBox="0 0 300 20" preserveAspectRatio="none" aria-hidden="true"><path d="M4 12 C 60 6, 120 4, 170 9 S 250 15, 296 7" /></svg></span></h1>
             <p class="lede">Medical, surgical and radiation oncology in one timeline, with reports flowing in from DICOM, labs and WhatsApp. AI highlights what changed. The oncologist decides.</p>
 
             <div class="role-cards" id="signin">
@@ -158,8 +157,8 @@
               <h3>PDF &amp; photo reports</h3>
               <p>AI reads lab values from any report; the clinician confirms.</p>
             </article>
-            <article class="int">
-              <div class="int-top"><span class="int-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.4A8.4 8.4 0 1 1 21 11.5z" /></svg></span><span class="status live">Live in beta · simulator</span></div>
+            <article class="int wa">
+              <div class="int-top"><span class="int-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.4A8.4 8.4 0 1 1 21 11.5z" /></svg></span><span class="status live">Live in beta</span></div>
               <h3>WhatsApp</h3>
               <p>Clinician-approved plans, prescriptions, summaries and visit reminders; symptom reports and voice notes back in the same chat.</p>
             </article>
@@ -279,16 +278,36 @@
           </div>
         </div>
       </section>
+
+      <!-- Closing band -->
+      <section class="cta">
+        <svg class="cta-pulse" viewBox="0 0 1200 80" preserveAspectRatio="none" aria-hidden="true"><path d="M0 50 H470 l14 -26 l18 52 l16 -60 l14 34 H1200" /></svg>
+        <div class="wrap">
+          <div>
+            <h2>See the beta for yourself.</h2>
+            <p>Sign in to the clinician workspace or the patient portal. Everything you see uses synthetic patients.</p>
+          </div>
+          <div class="cta-actions">
+            <a class="btn light lg" href="/clinician">Clinician sign in</a>
+            <a class="btn outline-light lg" href="/portal">Patient sign in</a>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer class="foot">
       <div class="wrap foot-inner">
-        <span>© 2026 Thravi OncoCare · Beta · Synthetic data only, not for clinical use</span>
-        <span><a href="/clinician">Clinician sign in</a> · <a href="/portal">Patient sign in</a></span>
+        <span class="foot-brand"><img src="/thravi-mark.png" alt="" width="30" height="28" />© 2026 Thravi OncoCare · Beta · Synthetic data only, not for clinical use</span>
+        <span><a href="https://thravi.in">thravi.in</a> · <a href="/clinician">Clinician sign in</a> · <a href="/portal">Patient sign in</a></span>
       </div>
     </footer>
 
     <script>
+      // Top bar gains a border once the page scrolls, as on thravi.in.
+      const bar = document.querySelector(".nav");
+      const onScroll = () => bar.classList.toggle("scrolled", window.scrollY > 8);
+      addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
       // If someone is already signed in, say so on the role card.
       (async () => {
         const check = async (url) => { try { const r = await fetch(url, { credentials: "same-origin" }); return r.ok ? await r.json() : null; } catch { return null; } };
