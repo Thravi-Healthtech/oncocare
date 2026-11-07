@@ -233,14 +233,19 @@ class DoctorAuthTests(unittest.TestCase):
 
     call = PortalTestCase.call
 
-    def test_doctor_api_requires_phone_password_login(self) -> None:
+    def test_doctor_api_requires_username_password_login(self) -> None:
         doctor = build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()))
         self.assertEqual(self.call(doctor, "GET", "/api/patients")[0], 401)
         self.assertEqual(self.call(doctor, "GET", "/api/lab-documents/1/file")[0], 401)
         self.assertEqual(self.call(doctor, "GET", "/api/auth/me")[0], 401)
-        self.assertEqual(self.call(doctor, "POST", "/api/auth/login", {"phone": "8008475309", "password": "0000"})[0], 401)
-        status, me, headers = self.call(doctor, "POST", "/api/auth/login", {"phone": "+91 80084 75309", "password": "1234"})
-        self.assertEqual((status, me["data"]["name"]), (200, "Dr. R. Khanna"))
+        self.assertEqual(self.call(doctor, "POST", "/api/auth/login", {"username": "chemodoc", "password": "1234"})[0], 401)
+        self.assertEqual(self.call(doctor, "POST", "/api/auth/login", {"phone": "8008475309", "password": "qwertyui"})[0], 401)  # no phone sign-in
+        for username, name, role in [("radiodoc", "Dr. P. Rao", "doctor"), ("surgerydoc", "Dr. A. Menon", "doctor"), ("staff", "Hospital staff", "staff")]:
+            other = build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()))
+            status, me, _ = self.call(other, "POST", "/api/auth/login", {"username": username, "password": "qwertyui"})
+            self.assertEqual((status, me["data"]["name"], me["data"]["role"]), (200, name, role))
+        status, me, headers = self.call(doctor, "POST", "/api/auth/login", {"username": " ChemoDoc ", "password": "qwertyui"})
+        self.assertEqual((status, me["data"]["name"], me["data"]["username"]), (200, "Dr. R. Khanna", "chemodoc"))
         self.assertIn("HttpOnly", headers["Set-Cookie"])
         self.assertEqual(self.call(doctor, "GET", "/api/patients")[0], 200)
         _, p, _ = self.call(doctor, "POST", "/api/patients", {"medical_record_number": "AUTH-1", "first_name": "A", "last_name": "B"})

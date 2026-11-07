@@ -163,5 +163,5 @@ done
 echo
 echo "   Demo sign-in password (clinician and patient portal):"
 echo "     $(aws ssm get-parameter --name /oncocare/demo_password --with-decryption --query Parameter.Value --output text)"
-echo "   Clinician test account: 8008475309"
+echo "   Clinician sign-in: radiodoc / chemodoc / surgerydoc / staff, password qwertyui"
 echo "   Server shell (needs session-manager-plugin): aws ssm start-session --region $REGION --target $INSTANCE"

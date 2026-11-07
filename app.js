@@ -1605,21 +1605,21 @@ function showDoctorLogin() {
   closeModals();
   $("#doctorLogin").hidden = false;
   $(".app-shell").hidden = true;
-  setTimeout(() => $("#doctorLoginForm [name=phone]")?.focus(), 30);
+  setTimeout(() => $("#doctorLoginForm [name=username]")?.focus(), 30);
 }
 function renderClinician() {
   const me = S.me;
   $("#clinicianName").textContent = me ? me.name : "Signed out";
-  $("#clinicianRole").textContent = me ? `${me.specialty || "Clinician"} · ${me.phone}` : "";
+  $("#clinicianRole").textContent = me ? `${me.specialty || "Clinician"} · ${me.username || me.phone}` : "";
   $("#clinicianInitials").textContent = me ? me.name.replace(/^Dr\.?\s*/i, "").split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase() : "—";
 }
 async function doctorSignIn(event) {
   event.preventDefault();
   const form = event.currentTarget;
-  const phone = form.elements.phone.value.trim(), password = form.elements.password.value;
-  if (!phone || !password) return formError(form, "Enter your mobile number and password.");
+  const username = form.elements.username.value.trim().toLowerCase(), password = form.elements.password.value;
+  if (!username || !password) return formError(form, "Enter your username and password.");
   await withBusy(form, async () => {
-    S.me = await post("/api/auth/login", { phone, password });
+    S.me = await post("/api/auth/login", { username, password });
     form.reset();
     $("#doctorLogin").hidden = true;
     $(".app-shell").hidden = false;

@@ -87,9 +87,17 @@ Speech-to-text uses the browser's speech service (Chrome, Edge, Safari). Where i
 
 ## v0.5: Sign-in and between-cycle review
 
-**Temporary sign-in (until OTP is added).** Both portals use mobile number + password. The password for every account is `1234`, set by `ONCOCARE_DEV_PASSWORD` in `.env`. This is not secure and is for local testing only.
+**Sign-in.** Doctors and staff sign in with a hospital username; patients use their mobile number + a temporary password (`ONCOCARE_DEV_PASSWORD`, `1234` locally) until OTP is added. Not secure; for the demo only.
 
-- **Doctor:** open http://127.0.0.1:4173/clinician (or **Clinician sign in** on the home page) and sign in with **8008475309** / **1234** (Dr. R. Khanna, created automatically). All `/api/*` doctor routes now require this session. "Recorded by" and "Confirmed by" default to the signed-in clinician.
+| Username | Account | Password |
+|---|---|---|
+| `chemodoc` | Dr. R. Khanna · Medical oncology | `qwertyui` |
+| `radiodoc` | Dr. P. Rao · Radiation oncology | `qwertyui` |
+| `surgerydoc` | Dr. A. Menon · Surgical oncology | `qwertyui` |
+| `staff` | Hospital staff | `qwertyui` |
+
+Accounts are created (or the old Dr. R. Khanna phone account is converted to `chemodoc`) when the database starts. Each has its own salted password hash, set from `ONCOCARE_STAFF_PASSWORD` (default `qwertyui`) only when the account has no password yet.
+- **Doctor / staff:** open http://127.0.0.1:4173/clinician (or **Clinician sign in** on the home page) and sign in with one of the usernames above. All `/api/*` clinician routes require this session. "Recorded by" and "Confirmed by" default to the signed-in account.
 - **Patients:** sign in at `/portal` with the mobile number saved on their record (**Edit patient → Mobile number**; numbers must be unique, and `+91` or a leading 0 is ignored). Demo patients seeded with `--seed` use 9000000018, 9000000031 and 9000000077.
 
 **Patient symptoms in the between-cycle window.** On a plan's **CTCAE** page, symptoms are grouped by between-cycle assessment window. Each window lists the patient's portal reports by date (onset date and sent date), alongside the clinician-recorded toxicities. A banner shows how many reports are waiting and jumps to their window. **Review & add as CTCAE toxicity** opens the CTCAE form pre-filled from the report. The clinician picks and confirms the grade, and the report is then marked "Recorded as CTCAE" and linked to that entry. Pre-cycle review also lists open patient reports for the upcoming cycle.

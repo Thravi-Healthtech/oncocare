@@ -1194,7 +1194,7 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             if path == "/api/auth/login" and method == "POST":
                 body = self._body()
                 with transaction(database_path) as connection:
-                    token, clinician = auth.login_clinician(connection, str(body.get("phone") or ""), str(body.get("password") or ""))
+                    token, clinician = auth.login_clinician(connection, str(body.get("username") or ""), str(body.get("password") or ""))
                 self._extra_headers.append(("Set-Cookie", f"{auth.DOCTOR_COOKIE}={token}; {cookie_attrs()}; Path=/; Max-Age={auth.SESSION_HOURS * 3600}"))
                 return {"data": clinician}, HTTPStatus.OK
             if path == "/api/auth/logout" and method == "POST":
