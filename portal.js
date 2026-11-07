@@ -71,7 +71,8 @@ async function start() {
 async function refresh() {
   const [plans, labs, reports, bank, radiotherapy, summaries, surgery] = await Promise.all([api("/api/portal/plans"), api("/api/portal/labs"), api("/api/portal/reports"),
     P.bank ? Promise.resolve(P.bank) : api("/api/portal/checkin/bank"), api("/api/portal/radiotherapy").catch(() => []), api("/api/portal/summaries").catch(() => []), api("/api/portal/surgery").catch(() => [])]);
-  Object.assign(P, { plans, labs, reports, bank, radiotherapy, summaries, surgery });
+  const prescriptions = await api("/api/portal/prescriptions").catch(() => []);
+  Object.assign(P, { plans, labs, reports, bank, radiotherapy, summaries, surgery, prescriptions });
   renderHome(); renderPlan(); renderReports(); renderHistory();
 }
 function route() {
@@ -151,7 +152,13 @@ function renderPlan() {
       ${c.discharge_date ? `<div class="drug-list"><div><strong>Went home</strong><span>${fmtDate(c.discharge_date)}</span></div>${c.suture_removal_date ? `<div><strong>Stitches out</strong><span>${fmtDate(c.suture_removal_date)}</span></div>` : ""}${c.follow_up_date ? `<div><strong>Next visit</strong><span>${fmtDate(c.follow_up_date)}</span></div>` : ""}</div>` : ""}
       ${c.wound_care ? `<h3>Wound care</h3><p>${esc(c.wound_care)}</p>` : ""}${c.discharge_instructions ? `<h3>At home</h3><p>${esc(c.discharge_instructions)}</p>` : ""}
     </article>`).join("");
-  const docs = (P.summaries || []).map(d => `<article class="card">
+  const rxCards = (P.prescriptions || []).map(rx => `<article class="card">
+      <p class="eyebrow">Prescription · ${fmtDate(rx.rx_date)}${rx.context_label ? ` · ${esc(rx.context_label)}` : ""}</p><h2>Medicines from ${esc(rx.prescribed_by)}</h2>
+      <div class="drug-list">${rx.items.map(m => `<div><strong>${esc(m.name)} ${esc(m.dose || "")}</strong><span>${esc([m.frequency, m.duration ? `for ${m.duration}` : "", m.instructions].filter(Boolean).join(" · "))}</span></div>`).join("")}</div>
+      ${rx.advice ? `<h3>Advice</h3><p>${esc(rx.advice)}</p>` : ""}
+      <a class="button secondary" href="/api/portal/prescriptions/${rx.id}/print" target="_blank" rel="noopener">View / download</a>
+    </article>`).join("");
+  const docs = rxCards + (P.summaries || []).map(d => `<article class="card">
       <p class="eyebrow">From your doctor · ${fmtDate(d.finalised_at)}</p><h2>${esc(d.title)}</h2>
       ${d.medications.length ? `<h3>Your medicines</h3><div class="drug-list">${d.medications.map(m => `<div><strong>${esc(m.name)} ${esc(m.dose || "")}</strong><span>${esc([m.frequency, m.duration ? `for ${m.duration}` : "", m.instructions].filter(Boolean).join(" · "))}</span></div>`).join("")}</div>` : ""}
       ${d.advice ? `<h3>Advice</h3><p>${esc(d.advice)}</p>` : ""}

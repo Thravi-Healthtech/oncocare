@@ -4,6 +4,7 @@
 const KIND_META = {
   chemo: ["Chemo", "kind-chemo"], rt: ["Radiotherapy", "kind-rt"], surgery: ["Surgery", "kind-sx"], surgery_note: ["Post-op", "kind-sx"], rt_review: ["RT review", "kind-rt"], toxicity: ["CTCAE", "kind-tox"], labs: ["Labs", "kind-labs"],
   complaint: ["Patient", "kind-patient"], note: ["Note", "kind-note"], document: ["Report", "kind-doc"], discharge: ["Summary", "kind-note"],
+  staging: ["Staging", "kind-note"], response: ["Response", "kind-labs"], prescription: ["Prescription", "kind-chemo"],
 };
 const NOTE_CATEGORIES = { progress: "Progress note", procedure: "Procedure", admission: "Admission", phone: "Phone call", counselling: "Counselling", tumour_board: "Tumour board", other: "Other" };
 const DOC_TYPES = { imaging: "Imaging report", pathology: "Histopathology", lab: "Lab report", discharge: "Previous discharge summary", referral: "Referral letter", other: "Other report" };
@@ -29,8 +30,8 @@ EXT.afterShow.push(view => { if (view === "discharge") $("#navPatient").classLis
 EXT.patientLoaders.push(async p => { p.discharge_summaries = await api(`/api/patients/${p.id}/discharge-summaries`).catch(() => []); });
 EXT.patientPanels.push(p => {
   const list = p.discharge_summaries || [];
-  return `<article class="panel span-full"><div class="panel-heading"><div><p class="eyebrow">Running summary &amp; documents</p><h2>Summaries</h2></div>
-      <div class="heading-actions"><a class="button secondary" href="#summary/${p.id}">Open running summary</a><button class="button primary" data-rec="new-discharge">Create discharge summary</button></div></div>
+  return `<article class="panel span-full"><div class="panel-heading"><div><p class="eyebrow">Case sheet &amp; documents</p><h2>Summaries</h2></div>
+      <div class="heading-actions"><a class="button secondary" href="#summary/${p.id}">Open case sheet</a><button class="button primary" data-rec="new-discharge">Create discharge summary</button></div></div>
     ${list.length ? list.map(d => `<div class="plan-row"><div class="plan-row-main"><strong>${esc(d.title)}</strong>
         <small>${esc(d.kind_label)} · v${d.version} · ${fmtDate(d.period_from)} to ${fmtDate(d.period_to)} · ${d.status === "final" ? `finalised by ${esc(d.finalised_by)} ${fmtDate(d.finalised_at)}` : `drafted ${fmtDate(d.created_at)}`}</small></div>
         <div>${dsPill(d.status)}${d.status === "draft" && d.unsupported ? ` <span class="chip chip-warn">${d.unsupported} sentence(s) to check</span>` : ""}</div>
@@ -53,6 +54,30 @@ function citationHtml(sentences, sourcesById) {
     const chips = s.sources.map(id => `<button class="cite" data-cite="${id}" title="${esc(sourcesById.get(id)?.title || (id === "S0" ? "Patient record" : id))}">${id}</button>`).join("");
     return `<span class="sentence ${s.unsupported ? "unsupported" : ""}" ${s.unsupported ? 'title="No source cited: check this sentence against the record"' : ""}>${text}${chips}</span>`;
   }).join(" ");
+}
+function caseSheetHead(d) {
+  const o = d.oncology || {};
+  const dx = o.diagnoses || [];
+  const latest = o.latest, base = o.baseline, best = o.best;
+  const rx = d.prescriptions || [], appts = d.appointments || [];
+  const RC = { CR: "chip-ok", PR: "chip-ok", SD: "chip-teal", PD: "chip-alert" };
+  return `<div class="snapshot-grid case-head">
+    <article class="panel snap"><p class="eyebrow">Diagnosis &amp; stage</p>
+      ${dx.length ? dx.map(x => `<div class="snap-line"><strong>${esc([x.laterality && x.laterality !== "na" ? x.laterality[0].toUpperCase() + x.laterality.slice(1) : "", x.primary_site].filter(Boolean).join(" "))}${x.histology ? ` · ${esc(x.histology)}` : ""}</strong>
+        <span>${esc(x.stage_text || "Not staged")}</span><span class="muted small">${x.biomarkers.map(b => `${esc(b.name)} ${esc(b.value)}`).join(", ")}${x.ecog != null ? ` · ECOG ${x.ecog}` : ""}</span></div>`).join("")
+        : `<p class="muted">Not recorded. <a href="#patient/${d.patient.id}">Record diagnosis &amp; staging</a></p>`}
+    </article>
+    <article class="panel snap"><p class="eyebrow">Tumour response</p>
+      ${latest ? `<div class="snap-line"><strong>${latest.response ? `<span class="chip ${RC[latest.response] || ""}">${esc(latest.response)}</span> ${esc(latest.response_label)}` : "Baseline measured"}</strong>
+        <span>${base && latest.sum_mm != null && latest.id !== base.id ? `${fmtNum(base.sum_mm)} → ${fmtNum(latest.sum_mm)} mm (${latest.change_from_baseline_pct > 0 ? "+" : ""}${fmtNum(latest.change_from_baseline_pct)}%)` : base ? `${fmtNum(base.sum_mm)} mm at baseline` : ""}</span>
+        <span class="muted small">${fmtShort(latest.assessment_date)} · ${esc(latest.modality_label)}${best?.response && best.id !== latest.id ? ` · best ${esc(best.response)}` : ""}${latest.markers.length ? ` · ${latest.markers.map(m => `${esc(m.name)} ${esc(m.value)}`).join(", ")}` : ""}</span></div>`
+        : '<p class="muted">No tumour measurement yet.</p>'}
+    </article>
+    <article class="panel snap"><p class="eyebrow">Medicines &amp; next visits</p>
+      ${rx.length ? `<div class="snap-line"><strong>Prescription ${fmtShort(rx[0].rx_date)}</strong><span>${rx[0].items.map(m => esc([m.name, m.dose].filter(Boolean).join(" "))).join(", ")}</span><span class="muted small">${esc(rx[0].prescribed_by)}</span></div>` : '<p class="muted">No prescription between cycles.</p>'}
+      ${appts.map(a => `<div class="snap-line"><strong>${fmtShort(a.appt_date)}${a.appt_time ? ` ${esc(a.appt_time)}` : ""}</strong><span>${esc(a.purpose || "Visit")}</span>${a.status === "reschedule_requested" ? '<span class="chip chip-warn">wants to reschedule</span>' : ""}</div>`).join("")}
+    </article>
+  </div>`;
 }
 function snapshotHtml(d) {
   const chemo = d.chemotherapy.filter(c => c.status === "active" || c.next_cycle);
@@ -84,14 +109,15 @@ function renderSummary() {
   const n = d.narrative;
   const byId = new Map(d.items.map(i => [i.id, i]));
   const narrativeSources = n ? new Map(n.sources.map(s => [s.id, s])) : byId;
-  const filters = ["all", "surgery", "rt", "chemo", "toxicity", "complaint", "labs", "note", "document"];
+  const filters = ["all", "staging", "response", "surgery", "rt", "chemo", "prescription", "toxicity", "complaint", "labs", "note", "document"];
   const items = [...d.items].reverse().filter(i => S.summaryFilter === "all" || i.kind === S.summaryFilter || (S.summaryFilter === "rt" && i.kind === "rt_review") || (S.summaryFilter === "surgery" && i.kind === "surgery_note"));
   let lastDate = "";
   $("#summaryContent").innerHTML = `
+    ${caseSheetHead(d)}
     ${snapshotHtml(d)}
     <div class="summary-layout top-gap">
       <div class="summary-main">
-        <article class="panel narrative-panel"><div class="panel-heading"><div><p class="eyebrow">Summary</p><h2>Course so far</h2></div>
+        <article class="panel narrative-panel"><div class="panel-heading"><div><p class="eyebrow">AI brief · from the record only</p><h2>How the treatment is going</h2></div>
             <button class="button ${n ? "secondary" : "primary"} small" data-rec="generate">${n ? "Regenerate" : "Generate summary"}</button></div>
           ${n ? `<p class="narrative">${citationHtml(n.sentences, narrativeSources)}</p>
             <p class="muted small">${esc(METHOD_LABEL[n.method] || n.method)}${n.model ? ` · ${esc(n.model)}` : ""} · ${fmtDateTime(n.generated_at)} by ${esc(n.generated_by || "")}${n.new_items ? ` · <strong class="text-amber">${n.new_items} new item(s) since — regenerate to include them</strong>` : ""}${n.unsupported ? ` · <span class="text-amber">${n.unsupported} sentence(s) without a source</span>` : ""}</p>
@@ -220,7 +246,7 @@ function renderDischarge() {
   const surg = (c.surgery || []).map(x => `<li><strong>${esc(x.procedure)}</strong> — ${x.surgery_date ? `${["completed", "discharged"].includes(x.status) ? "operated" : "planned for"} ${fmtDate(x.surgery_date)}` : esc(x.status_label)}${x.approach ? ` (${esc(x.approach)})` : ""}${x.discharge_date ? `, discharged ${fmtDate(x.discharge_date)}` : ""}
       <ul>${x.pathology ? `<li>Histopathology: ${esc(x.pathology.histology)}${x.stage ? `, ${esc(x.stage)}` : ""}${x.pathology.margins ? `, margins ${esc(x.pathology.margins)}` : ""}</li>` : ""}
       ${x.complications.length ? `<li>Complications: ${esc(x.complications.join("; "))}</li>` : ""}${x.length_of_stay != null ? `<li>Length of stay ${x.length_of_stay} day(s)</li>` : ""}${x.cancel_reason ? `<li>Cancelled: ${esc(x.cancel_reason)}</li>` : ""}</ul></li>`).join("");
-  const ACT_LABEL = { chemo: "Chemotherapy", rt: "Radiotherapy", rt_review: "RT review", surgery: "Surgery", surgery_note: "Post-op", toxicity: "CTCAE", labs: "Investigations", complaint: "Patient message", note: "Clinical note", document: "Report", discharge: "Summary" };
+  const ACT_LABEL = { staging: "Diagnosis & staging", response: "Tumour assessment", prescription: "Prescription", chemo: "Chemotherapy", rt: "Radiotherapy", rt_review: "RT review", surgery: "Surgery", surgery_note: "Post-op", toxicity: "CTCAE", labs: "Investigations", complaint: "Patient message", note: "Clinical note", document: "Report", discharge: "Summary" };
   let lastDay = "";
   const activity = (c.activity || []).map(a => {
     const head = a.date !== lastDay ? `<h4 class="act-day">${fmtDate(a.date)}</h4>` : "";
@@ -233,6 +259,14 @@ function renderDischarge() {
     <form id="dischargeForm" class="discharge-doc panel" novalidate>
       ${locked ? `<div class="locked-note">${ds.status === "final" ? `Finalised by ${esc(ds.finalised_by)} on ${fmtDateTime(ds.finalised_at)}. Create a new version to change it.` : "This version was replaced by a newer one."}</div>` : '<div class="draft-note"><strong>Draft.</strong> Sections marked <span class="from-record">From the record</span> are rebuilt from the chart; the rest is yours to edit. Medicines, condition, advice and follow-up are never generated.</div>'}
       <section><h2>Diagnosis</h2><textarea name="diagnosis" rows="2" maxlength="4000" ${locked ? "disabled" : ""}>${esc(c.diagnosis || "")}</textarea></section>
+      ${(c.staging || []).length ? `<section><h2>Diagnosis &amp; staging <span class="muted small">from the record</span></h2>${c.staging.map(x => `<p><strong>${esc(x.summary)}</strong><br><span class="muted small">Diagnosed ${fmtDate(x.diagnosis_date)}${x.method ? ` by ${esc(x.method)}` : ""}${x.markers?.length ? ` · baseline ${x.markers.map(m => `${esc(m.name)} ${esc(m.value)} ${esc(m.unit)}`).join(", ")}` : ""}</span></p>`).join("")}</section>` : ""}
+      ${c.response?.assessments?.length ? `<section><h2>Tumour response <span class="muted small">RECIST 1.1 unless recorded by the clinician</span></h2>
+        <div class="table-wrap"><table class="med-table"><thead><tr><th>Date</th><th>Assessment</th><th>Target lesions</th><th>Sum</th><th>vs baseline</th><th>Markers</th><th>Response</th></tr></thead><tbody>
+        ${c.response.assessments.map(a => `<tr><td>${fmtDate(a.assessment_date)}</td><td>${esc(a.modality_label)}<br><small class="muted">${esc(a.timepoint_label)}${a.cycle_label ? ` · ${esc(a.cycle_label)}` : ""}</small></td>
+          <td>${esc(a.targets.join("; ") || "—")}${a.new.length ? "<br><b>New lesion</b>" : ""}</td><td>${a.sum_mm != null ? `${fmtNum(a.sum_mm)} mm` : "—"}</td>
+          <td>${a.change_from_baseline_pct != null ? `${a.change_from_baseline_pct > 0 ? "+" : ""}${fmtNum(a.change_from_baseline_pct)}%` : "—"}</td>
+          <td>${(a.markers || []).map(m => `${esc(m.name)} ${esc(m.value)} ${esc(m.unit)}`).join("<br>") || "—"}</td><td><b>${esc(a.response || "Baseline")}</b> ${a.response ? esc(a.response_label || "") : ""}</td></tr>`).join("")}
+        </tbody></table></div>${c.response.best ? `<p>Best response <b>${esc(c.response.best)}</b>${c.response.latest ? ` · latest <b>${esc(c.response.latest)}</b>` : ""}</p>` : ""}</section>` : ""}
       <section><h2>Treatment given <span class="from-record">From the record</span></h2>
         ${surg ? `<p class="eyebrow">Surgery</p><ul class="ds-list">${surg}</ul>` : ""}${chemo ? `<p class="eyebrow">Chemotherapy</p><ul class="ds-list">${chemo}</ul>` : ""}${rt ? `<p class="eyebrow">Radiotherapy</p><ul class="ds-list">${rt}</ul>` : ""}${!chemo && !rt && !surg ? '<p class="muted">No treatment recorded in this period.</p>' : ""}</section>
       <section><h2>Course during treatment <span class="method-tag">${esc(METHOD_LABEL[course.method] || course.method || "")}${course.model ? ` · ${esc(course.model)}` : ""}</span></h2>

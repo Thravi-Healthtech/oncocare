@@ -443,6 +443,11 @@ def collect(connection: sqlite3.Connection, patient_id: int, period_from: str | 
     notes = rows(connection, "SELECT * FROM clinical_notes WHERE patient_id = ? ORDER BY note_date, id", (patient_id,))
     for note in notes:
         add(note["note_date"], "note", f"{NOTE_CATEGORIES.get(note['category'], 'Note')} — {note['author']}", note["text"], {"type": "note", "id": note["id"]})
+    for rx in rows(connection, "SELECT * FROM prescriptions WHERE patient_id = ? AND status = 'active' ORDER BY rx_date, id", (patient_id,)):
+        meds = json.loads(rx["items_json"] or "[]")
+        detail = "; ".join(" ".join(x for x in (m["name"], m.get("dose"), m.get("frequency"), f"for {m['duration']}" if m.get("duration") else "") if x) for m in meds)
+        add(rx["rx_date"], "prescription", f"Prescription — {rx['prescribed_by']}", detail + (f". Advice: {rx['advice']}" if rx["advice"] else ""),
+            {"type": "prescription", "id": rx["id"]})
     documents = rows(connection, "SELECT * FROM patient_documents WHERE patient_id = ? ORDER BY doc_date, id", (patient_id,))
     for doc in documents:
         add(doc["doc_date"], "document", f"{DOC_TYPES.get(doc['doc_type'], 'Report')}: {doc['title']}",
@@ -451,7 +456,16 @@ def collect(connection: sqlite3.Connection, patient_id: int, period_from: str | 
         add(d["finalised_at"][:10], "discharge", "Discharge summary finalised", f"Period {d['period_from'] or '—'} to {d['period_to'] or '—'}",
             {"type": "discharge", "id": d["id"]})
 
-    rank = {"note": 0, "document": 1, "labs": 2, "surgery": 3, "surgery_note": 3, "chemo": 4, "rt": 5, "rt_review": 6, "toxicity": 7, "complaint": 8, "discharge": 9}
+    from . import oncology  # local import: oncology uses records helpers
+    onco = oncology.overview_for(connection, patient_id, period_to)
+    for d in onco["diagnoses"]:
+        add(d["diagnosis_date"], "staging", f"Diagnosis: {d['primary_site']}" + (f" — {d['stage_text']}" if d["stage_text"] else ""), d["summary"],
+            {"type": "diagnosis", "id": d["id"]})
+    for a in onco["assessments"]:
+        add(a["assessment_date"], "response", f"Tumour assessment ({a['timepoint_label'].lower()})", oncology.assessment_line(a),
+            {"type": "tumour_assessment", "id": a["id"]}, "warn" if a["response"] == "PD" else None)
+
+    rank = {"staging": 0, "response": 1, "note": 0, "document": 1, "labs": 2, "surgery": 3, "surgery_note": 3, "chemo": 4, "rt": 5, "rt_review": 6, "toxicity": 7, "complaint": 8, "discharge": 9}
     items.sort(key=lambda i: (i["date"], rank.get(i["kind"], 99)))  # stable: surgery events keep their recorded order
     for index, item in enumerate(items, start=1):
         item["id"] = f"S{index}"
@@ -468,6 +482,11 @@ def collect(connection: sqlite3.Connection, patient_id: int, period_from: str | 
         "patient": {k: patient[k] for k in ("id", "first_name", "last_name", "medical_record_number", "date_of_birth", "sex", "diagnosis", "phone")} | {"age": age},
         "period": {"from": period_from, "to": period_to},
         "chemotherapy": chemo, "radiotherapy": radiotherapy, "surgery": surgeries,
+        "oncology": {k: onco[k] for k in ("diagnoses", "assessments", "baseline", "latest", "best")},
+        "prescriptions": [{"id": r["id"], "rx_date": r["rx_date"], "prescribed_by": r["prescribed_by"], "items": json.loads(r["items_json"] or "[]")}
+                          for r in rows(connection, "SELECT * FROM prescriptions WHERE patient_id = ? AND status = 'active' ORDER BY rx_date DESC, id DESC LIMIT 3", (patient_id,))],
+        "appointments": rows(connection, "SELECT id, appt_date, appt_time, purpose, status FROM appointments WHERE patient_id = ? AND appt_date >= ? "
+                                         "AND status IN ('booked', 'reschedule_requested') ORDER BY appt_date, appt_time LIMIT 5", (patient_id, date.today().isoformat())),
         "toxicities": sorted(toxicities.values(), key=lambda t: (-t["worst_grade"], t["term"])),
         "labs": [latest_labs[name] for name in KEY_LABS if name in latest_labs],
         "complaints": complaints,
@@ -505,7 +524,12 @@ def rules_narrative(facts: dict[str, Any]) -> str:
     if p.get("age") is not None:
         who += f", a {p['age']}-year-old" + (f" {p['sex']}" if p.get("sex") in ("female", "male") else "") + ","
     verb = "was treated for" if facts["period"]["to"] else "is under treatment for"
-    sentences = [f"{who} {verb} {p['diagnosis'] or 'a diagnosis not recorded'}. [S0]"]
+    onco = facts.get("oncology") or {}
+    staged = onco.get("diagnoses") or []
+    if staged:
+        sentences = [f"{who} {verb} {'; '.join(d['summary'] for d in staged)}." + _cite(_sid(items, type="diagnosis"))]
+    else:
+        sentences = [f"{who} {verb} {p['diagnosis'] or 'a diagnosis not recorded'}. [S0]"]
     for plan in facts["chemotherapy"]:
         ids = _sid(items, type="cycle", plan_id=plan["plan_id"])
         if plan["cycles_given"]:
@@ -573,6 +597,18 @@ def rules_narrative(facts: dict[str, Any]) -> str:
     if abnormal:
         sentences.append("Latest verified labs outside the reference range: " + ", ".join(f"{l['test_name']} {l['value']:g} {l['unit']} ({l['collection_date']})" for l in abnormal) + "."
                          + _cite([i["id"] for i in items if i["kind"] == "labs"][-2:]))
+    measured = [a for a in onco.get("assessments") or [] if a.get("sum_mm") is not None]
+    if len(measured) >= 2:
+        first, last = measured[0], measured[-1]
+        change = f"{last['change_from_baseline_pct']:+.0f}%" if last.get("change_from_baseline_pct") is not None else "no change"
+        text = (f"Tumour size (sum of target lesions) went from {first['sum_mm']:g} mm on {first['assessment_date']} to {last['sum_mm']:g} mm on "
+                f"{last['assessment_date']} ({change}), response {last['response'] or 'not assessed'}")
+        if onco.get("best") and onco["best"].get("response") and onco["best"]["response"] != last.get("response"):
+            text += f"; best response {onco['best']['response']}"
+        sentences.append(text + "." + _cite([i["id"] for i in items if i["kind"] == "response"][-3:]))
+    elif measured:
+        sentences.append(f"Baseline tumour measurement on {measured[0]['assessment_date']}: sum of target lesions {measured[0]['sum_mm']:g} mm."
+                         + _cite([i["id"] for i in items if i["kind"] == "response"][:1]))
     docs = [i for i in items if i["kind"] == "document"]
     if docs:
         sentences.append("Reports on file: " + "; ".join(f"{d['title']} ({d['date']})" for d in docs[-3:]) + "." + _cite([d["id"] for d in docs[-3:]]))
@@ -592,9 +628,17 @@ def check_citations(text: str, valid: set[str]) -> dict[str, Any]:
     return {"sentences": sentences, "unsupported": sum(1 for s in sentences if s["unsupported"])}
 
 
+PROGRESS_BRIEF = ("Write a brief 'how the treatment is going' summary for the treating oncologist's running case sheet, in this order: "
+                  "the cancer and its stage; the treatment given so far and where the patient is now (cycle / fraction / post-op day); "
+                  "tumour response (size trend and RECIST response, tumour markers); how the treatment is tolerated (worst toxicity grades, "
+                  "delays, dose changes, missed fractions, complications); open issues (unreviewed patient messages, red flags, abnormal labs); "
+                  "and what is scheduled next. Skip any part the sources do not cover. At most 150 words.\n")
+
+
 def ai_narrative(facts: dict[str, Any], purpose: str = "running summary") -> str:
     status = extraction.ai_status()
-    prompt = (f"Write the {purpose} paragraph(s) for an oncology patient record, for the treating doctor.\n"
+    brief = PROGRESS_BRIEF if purpose == "running summary" else ""
+    prompt = (brief + f"Write the {purpose} paragraph(s) for an oncology patient record, for the treating doctor.\n"
               "Use ONLY the numbered sources below. After every sentence put the source ids it relies on, like [S3][S7]. "
               "Do not add facts, interpretation of causes, prognosis, or treatment recommendations. Keep doses, dates and grades exactly as "
               "written. Neutral clinical English, past tense for events, at most 180 words, no headings, no bullet points.\n\n"

@@ -64,6 +64,9 @@ def _long_date(value: str | None) -> str:
 
 
 def _diagnosis(facts: dict[str, Any]) -> str:
+    diagnoses = (facts.get("oncology") or {}).get("diagnoses") or []
+    if diagnoses:
+        return "; ".join(d["summary"] for d in diagnoses)
     parts = [facts["patient"].get("diagnosis") or ""]
     for course in facts["radiotherapy"]:
         extra = ", ".join(x for x in (course.get("stage"), course.get("histopathology")) if x)
@@ -97,6 +100,16 @@ def _build(connection: sqlite3.Connection, patient_id: int, period_from: str, pe
     }
     excluded = {a["key"] for a in keep.get("activity") or [] if not a.get("include", True)}
     content["surgery"] = facts.get("surgery", [])
+    onco = facts.get("oncology") or {}
+    content["staging"] = [{k: d.get(k) for k in ("diagnosis_date", "primary_site", "laterality", "histology", "grade", "method", "tnm", "stage_group",
+                                                  "staging_system", "intent", "ecog", "biomarkers", "markers", "summary")} for d in onco.get("diagnoses") or []]
+    content["response"] = {
+        "assessments": [{k: a.get(k) for k in ("assessment_date", "modality_label", "timepoint_label", "cycle_label", "sum_mm", "change_from_baseline_pct",
+                                                "change_from_nadir_pct", "response", "response_label", "response_override", "response_note", "computed_reason", "markers")}
+                        | {"targets": [f"{l['location']} {l['size_mm']:g} mm" for l in a["lesions"] if l["kind"] == "target"],
+                           "new": [l["location"] for l in a["lesions"] if l["kind"] == "new"] or (["yes"] if a.get("new_lesions") else [])}
+                        for a in onco.get("assessments") or [] if not period_from or a["assessment_date"] >= period_from or a["timepoint"] == "baseline"],
+        "best": (onco.get("best") or {}).get("response"), "latest": (onco.get("latest") or {}).get("response")}
     content["activity"] = [{"key": activity_key(i), "id": i["id"], "date": i["date"], "kind": i["kind"], "title": i["title"], "detail": i["detail"],
                             "severity": i.get("severity"), "include": activity_key(i) not in excluded} for i in facts["items"]]
     sources = [{k: i[k] for k in ("id", "date", "kind", "title", "detail", "ref")} for i in facts["items"]]
@@ -105,7 +118,8 @@ def _build(connection: sqlite3.Connection, patient_id: int, period_from: str, pe
 
 ACTIVITY_LABEL = {"chemo": "Chemotherapy", "rt": "Radiotherapy", "rt_review": "Radiotherapy review", "surgery": "Surgery", "surgery_note": "Post-operative",
                   "toxicity": "Toxicity (CTCAE)", "labs": "Investigations", "complaint": "Patient message", "note": "Clinical note", "document": "Report",
-                  "discharge": "Summary"}
+                  "discharge": "Summary", "prescription": "Prescription",
+                  "staging": "Diagnosis & staging", "response": "Tumour assessment"}
 
 
 def activity_key(item: dict[str, Any]) -> str:
@@ -295,6 +309,40 @@ def _strip_citations(text: str) -> str:
     return re.sub(r"\s*(\[S\d+\])+", "", text or "").strip()
 
 
+
+def _staging_table(d: dict[str, Any]) -> str:
+    site = " ".join(x for x in ((d.get("laterality") or "").replace("na", "").capitalize(), d["primary_site"]) if x)
+    rows_ = [("Primary site", site),
+             ("Diagnosed", d["diagnosis_date"] + (f" by {d['method']}" if d.get("method") else "")),
+             ("Histology", " ".join(x for x in (d.get("histology") or "", f"(grade {d['grade']})" if d.get("grade") else "") if x)),
+             ("TNM / stage", ", ".join(x for x in (d.get("tnm") or "", f"Stage {d['stage_group']}" if d.get("stage_group") else "", d.get("staging_system") or "") if x)),
+             ("Biomarkers", ", ".join(f"{b['name']} {b['value']}" for b in d.get("biomarkers") or [])),
+             ("Baseline markers", ", ".join(f"{m['name']} {m['value']} {m['unit']}".strip() for m in d.get("markers") or [])),
+             ("Intent / ECOG", ", ".join(x for x in ((d.get("intent") or "").capitalize(), f"ECOG {d['ecog']}" if d.get("ecog") is not None else "") if x))]
+    return "<table><tbody>" + "".join(f"<tr><th>{_e(k)}</th><td>{_e(v)}</td></tr>" for k, v in rows_ if v) + "</tbody></table>"
+
+
+def _response_table(resp: dict[str, Any]) -> str:
+    if not resp.get("assessments"):
+        return ""
+    out = ["<table><thead><tr><th>Date</th><th>Assessment</th><th>Target lesions</th><th>Sum</th><th>vs baseline</th><th>Markers</th><th>Response</th></tr></thead><tbody>"]
+    for a in resp["assessments"]:
+        when = a["timepoint_label"] + (f" · {a['cycle_label']}" if a.get("cycle_label") else "")
+        total = f"{a['sum_mm']:g} mm" if a["sum_mm"] is not None else "—"
+        change = f"{a['change_from_baseline_pct']:+.0f}%" if a["change_from_baseline_pct"] is not None else "—"
+        markers = ", ".join(f"{m['name']} {m['value']} {m['unit']}".strip() for m in a.get("markers") or []) or "—"
+        note = f'<br><span class="meta">clinician: {_e(a.get("response_note") or "")}</span>' if a.get("response_override") else ""
+        new = "<br><b>New lesion</b>" if a.get("new") else ""
+        out.append(f"<tr><td style=\"white-space:nowrap\">{_e(_long_date(a['assessment_date']))}</td><td>{_e(a['modality_label'])}<br><span class=\"meta\">{_e(when)}</span></td>"
+                   f"<td>{_e('; '.join(a['targets']) or '—')}{new}</td><td>{_e(total)}</td><td>{_e(change)}</td><td>{_e(markers)}</td>"
+                   f"<td><b>{_e(a.get('response') or 'Baseline')}</b> {_e(a.get('response_label') or '') if a.get('response') else ''}{note}</td></tr>")
+    out.append("</tbody></table>")
+    if resp.get("best"):
+        latest = f" · latest: <b>{_e(resp['latest'])}</b>" if resp.get("latest") else ""
+        out.append(f"<p>Best response: <b>{_e(resp['best'])}</b>{latest} (RECIST 1.1 unless recorded by the clinician).</p>")
+    return "".join(out)
+
+
 def print_html(db: str, summary_id: int, patient_id: int | None = None) -> str:
     with transaction(db) as connection:
         row = _load(connection, summary_id)
@@ -352,6 +400,8 @@ def print_html(db: str, summary_id: int, patient_id: int | None = None) -> str:
     meds = ("<table><thead><tr><th>Medicine</th><th>Dose</th><th>Route</th><th>How often</th><th>For how long</th><th>Instructions</th></tr></thead><tbody>"
             + "".join(f"<tr><td>{_e(m['name'])}</td><td>{_e(m['dose'])}</td><td>{_e(m.get('route', ''))}</td><td>{_e(m['frequency'])}</td><td>{_e(m['duration'])}</td>"
                       f"<td>{_e(m['instructions'])}</td></tr>" for m in c["medications"]) + "</tbody></table>") if c["medications"] else "<p>None.</p>"
+    staging = "".join(_staging_table(d) for d in c.get("staging") or [])
+    response = _response_table(c.get("response") or {})
     fu = c.get("follow_up") or {}
     follow = ("<p>No follow-up visit booked.</p>" if fu.get("none") else
               f"<p><strong>{_e(date.fromisoformat(fu['date']).strftime('%d %b %Y') if fu.get('date') else '—')}</strong>"
@@ -385,6 +435,8 @@ footer {{ margin-top:28px; padding-top:10px; border-top:1px solid var(--line); c
 <div class="grid"><div><b>Patient</b>{_e(p['first_name'])} {_e(p['last_name'])}</div><div><b>MRN</b>{_e(p['medical_record_number'])}</div>
 <div><b>Age / sex</b>{_e(age)} {_e(p.get('sex') or '')}</div><div><b>Mobile</b>{_e(p.get('phone') or '—')}</div></div>
 {section('Diagnosis', f'<p>{_e(c["diagnosis"])}</p>')}
+{section('Diagnosis & staging', staging)}
+{section('Tumour response', response)}
 {section('Surgery', surg)}
 {section('Chemotherapy', chemo)}
 {section('Radiotherapy', radio)}

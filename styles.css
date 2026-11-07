@@ -1174,3 +1174,39 @@ details.flag-item > summary::-webkit-details-marker { display: none; }
   .act-item > span:last-child { grid-column: 2; }
   .postop-note { grid-template-columns: 56px minmax(0, 1fr) auto; }
 }
+
+/* Prescriptions + consultation scribe */
+.rx-scribe { border: 1px dashed var(--line, #d9e1e7); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; background: rgba(14, 110, 106, 0.04); display: grid; gap: 8px; }
+.rx-scribe-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.rx-scribe-head small { display: block; }
+.rx-scribe textarea { width: 100%; }
+.rx-scribe select { width: auto; }
+[data-rx="record"].recording { background: #fdecec; border-color: #c0392b; color: #a12b1f; }
+.rx-notes { margin-top: 4px; font-size: 13px; }
+.rx-notes summary { cursor: pointer; color: var(--accent, #0e6e6a); }
+.muted-row { opacity: 0.6; }
+@media (max-width: 640px) { .rx-scribe-head { flex-direction: column; } }
+
+/* Diagnosis, staging & tumour response */
+.form-grid.four { grid-template-columns: repeat(4, 1fr); }
+.onc-diag { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+.onc-diag-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 16px; margin-top: 8px; font-size: 14px; }
+.onc-diag-grid small, .onc-kpis small { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.onc-response { display: grid; grid-template-columns: minmax(220px, 1fr) 2fr; gap: 16px; align-items: start; }
+.onc-kpis { display: grid; gap: 12px; }
+.onc-kpis strong { display: block; font-size: 17px; margin: 2px 0; }
+.onc-chart { margin: 0; }
+.onc-chart svg { width: 100%; height: auto; font: 11px var(--font, system-ui); }
+.onc-chart .grid { stroke: var(--soft-line, #edf2f0); }
+.onc-chart .base { stroke: #8a9a9b; stroke-dasharray: 4 3; }
+.onc-chart .pr { stroke: #2f6a47; stroke-dasharray: 2 4; }
+.onc-chart .line { fill: none; stroke: #0e6e6a; stroke-width: 2.5; }
+.onc-chart text { fill: var(--muted); }
+.onc-chart .lbl { font-size: 10px; }
+.onc-table td { vertical-align: top; font-size: 14px; }
+.onc-lesion.new { color: #b03a2e; }
+.onc-pair { display: flex; gap: 8px; margin-bottom: 6px; }
+.onc-pair input { flex: 1; min-width: 0; }
+.onc-tnm { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px 4px; margin: 10px 0; }
+td.center { text-align: center; }
+@media (max-width: 760px) { .onc-response, .form-grid.four { grid-template-columns: 1fr; } .onc-pair { flex-wrap: wrap; } }

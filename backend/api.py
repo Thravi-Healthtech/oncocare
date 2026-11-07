@@ -1242,6 +1242,9 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             if path == "/api/portal/surgery" and method == "GET":
                 with transaction(database_path) as connection:
                     return {"data": portal.portal_surgery(connection, patient_id)}, HTTPStatus.OK
+            if path == "/api/portal/prescriptions" and method == "GET":
+                from . import prescriptions
+                return {"data": prescriptions.for_patient(database_path, patient_id)}, HTTPStatus.OK
             if path == "/api/portal/summaries" and method == "GET":
                 from . import discharge
                 return {"data": discharge.for_patient(database_path, patient_id)}, HTTPStatus.OK
@@ -1287,6 +1290,11 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
                 with transaction(database_path) as connection:
                     file_path, content_type = portal.audio_for(connection, int(match.group(1)), patient_id)
                 return file_path, content_type, None
+            match = re.fullmatch(r"/api/portal/prescriptions/(\d+)/print", path)
+            if match:
+                from . import prescriptions
+                patient_id = self._portal_patient()
+                return routes_ext.RawResponse(prescriptions.print_html(database_path, int(match.group(1)), patient_id=patient_id).encode(), "text/html; charset=utf-8")
             match = re.fullmatch(r"/api/portal/summaries/(\d+)/print", path)
             if match:
                 from . import discharge
@@ -1419,7 +1427,7 @@ def make_handler(db_path: str | Path, static_dir: str | Path | None = None, requ
             pages = {"": "home.html", "/": "home.html", "/clinician": "index.html", "/clinician/": "index.html", "/portal": "portal.html", "/portal/": "portal.html"}
             relative = pages.get(request_path, request_path.lstrip("/"))
             if relative not in {"home.html", "home.css", "index.html", "app.js", "styles.css", "favicon.ico", "portal.html", "portal.js", "portal.css",
-                                "rt.js", "surgery.js", "records.js", "whatsapp.js"}:
+                                "rt.js", "surgery.js", "records.js", "whatsapp.js", "prescriptions.js", "oncology.js"}:
                 return self._json(404, {"error": {"message": "Not found"}})
             target = (web_root / relative).resolve()
             if web_root not in target.parents and target != web_root:
