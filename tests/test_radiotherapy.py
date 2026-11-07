@@ -5,6 +5,7 @@ import os
 import tempfile
 import threading
 import unittest
+from unittest import mock
 from datetime import date, timedelta
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -266,17 +267,22 @@ class WhatsAppTests(Base):
     def last_bot(self, thread: dict) -> str:
         return [m for m in thread["messages"] if m["direction"] == "out"][-1]["body"]
 
-    def test_consent_and_approved_reminder(self) -> None:
+    def test_whatsapp_on_by_default_and_scheduled_reminder(self) -> None:
+        _, thread = self.call("GET", f"/api/patients/{self.pid}/whatsapp")
+        self.assertEqual((thread["data"]["patient"]["wa_opt_in"], thread["data"]["patient"]["wa_opt_in_method"]), (1, "default"))
         visit = (date.today() + timedelta(days=5)).isoformat()
         status, body = self.call("POST", f"/api/patients/{self.pid}/whatsapp/compose", {"kind": "reminder", "visit_date": visit, "visit_time": "10:30",
                                                                                        "purpose": "Review after radiotherapy"})
         self.assertEqual(status, 201, body)
         draft = body["data"]
         self.assertEqual(draft["status"], "draft")
-        self.assertTrue(any("opted in" in c["text"] for c in draft["checks"]))
+        self.assertFalse(any(c["severity"] == "alert" for c in draft["checks"]))
+        self.assertEqual([b["title"] for b in draft["buttons"]], ["Confirm visit", "Reschedule"])
+        # A clinician can still turn WhatsApp off for one patient; sending is then refused.
+        self.call("POST", f"/api/patients/{self.pid}/whatsapp/consent", {"opt_in": False})
         status, _ = self.call("POST", f"/api/whatsapp/messages/{draft['id']}/send", {})
         self.assertEqual(status, 422)
-        status, _ = self.call("POST", f"/api/patients/{self.pid}/whatsapp/consent", {"opt_in": True, "method": "in_clinic_written", "language": "en"})
+        status, _ = self.call("POST", f"/api/patients/{self.pid}/whatsapp/consent", {"opt_in": True, "method": "clinician_on", "language": "en"})
         self.assertEqual(status, 200)
         status, body = self.call("POST", f"/api/whatsapp/messages/{draft['id']}/send", {})
         self.assertEqual(status, 200, body)
@@ -290,6 +296,105 @@ class WhatsAppTests(Base):
         self.assertGreaterEqual(whatsapp.run_due(str(self.db))["sent"], 1)
         _, thread = self.call("GET", f"/api/patients/{self.pid}/whatsapp")
         self.assertEqual(next(m for m in thread["data"]["messages"] if m["id"] == draft["id"])["status"], "sent")
+
+    def send_reminder_now(self, days: int = 3) -> dict:
+        visit = (date.today() + timedelta(days=days)).isoformat()
+        _, body = self.call("POST", f"/api/patients/{self.pid}/whatsapp/compose", {"kind": "reminder", "visit_date": visit, "visit_time": "09:15",
+                                                                                 "purpose": "Follow-up after surgery", "send_now": True})
+        status, sent = self.call("POST", f"/api/whatsapp/messages/{body['data']['id']}/send", {})
+        self.assertEqual((status, sent["data"]["status"]), (200, "sent"), sent)
+        return sent["data"]
+
+    def test_reminder_confirm_books_appointment(self) -> None:
+        reminder = self.send_reminder_now()
+        status, body = self.call("POST", "/api/whatsapp/simulate", {"patient_id": self.pid, "button_id": reminder["buttons"][0]["id"]})
+        self.assertEqual(status, 201, body)
+        self.assertEqual(body["data"]["action"], "visit_booked")
+        self.assertIn("is booked", self.last_bot(body["data"]["thread"]))
+        _, appts = self.call("GET", f"/api/patients/{self.pid}/appointments")
+        self.assertEqual([(a["appt_date"], a["appt_time"], a["status"], a["source"]) for a in appts["data"]],
+                         [(reminder["meta"]["visit_date"], "09:15", "booked", "whatsapp")])
+        # Tapping again does not create a second appointment; "My schedule" now lists the booked visit.
+        self.call("POST", "/api/whatsapp/simulate", {"patient_id": self.pid, "button_id": reminder["buttons"][0]["id"]})
+        _, appts = self.call("GET", f"/api/patients/{self.pid}/appointments")
+        self.assertEqual(len(appts["data"]), 1)
+        _, body = self.call("POST", "/api/whatsapp/simulate", {"patient_id": self.pid, "button_id": "menu_schedule"})
+        self.assertIn("Booked visits", self.last_bot(body["data"]["thread"]))
+        # The clinician can mark it attended.
+        status, body = self.call("PATCH", f"/api/appointments/{appts['data'][0]['id']}", {"status": "attended"})
+        self.assertEqual((status, body["data"]["status"]), (200, "attended"))
+
+    def test_reminder_reschedule_and_typed_confirm(self) -> None:
+        reminder = self.send_reminder_now()
+        result = self.say("Reschedule")
+        self.assertEqual(result["action"], "visit_reschedule")
+        _, appts = self.call("GET", f"/api/patients/{self.pid}/appointments")
+        self.assertEqual(appts["data"][0]["status"], "reschedule_requested")
+        # Their next message (the day that suits them) goes to the clinician inbox.
+        self.assertEqual(self.say("Friday morning would suit me")["action"], "report")
+        self.assertEqual(self.say("confirm")["action"], "visit_booked")
+        _, appts = self.call("GET", f"/api/patients/{self.pid}/appointments")
+        self.assertEqual([a["status"] for a in appts["data"]], ["booked"])
+        self.assertEqual(appts["data"][0]["reminder_message_id"], reminder["id"])
+
+    def test_clinician_books_appointment(self) -> None:
+        day = (date.today() + timedelta(days=9)).isoformat()
+        status, body = self.call("POST", f"/api/patients/{self.pid}/appointments", {"appt_date": day, "appt_time": "11:00", "purpose": "Review"})
+        self.assertEqual((status, body["data"]["status"], body["data"]["source"]), (201, "booked", "clinician"))
+        self.assertEqual(self.call("POST", f"/api/patients/{self.pid}/appointments", {"appt_date": "soon"})[0], 422)
+
+    def test_send_document(self) -> None:
+        import base64
+        _, doc = self.call("POST", f"/api/patients/{self.pid}/documents", {
+            "filename": "ct.pdf", "content_type": "application/pdf", "doc_type": "imaging", "title": "CT chest", "doc_date": "2026-11-02",
+            "data_base64": base64.b64encode(b"%PDF-1.4 minimal").decode()})
+        self.assertEqual(self.call("POST", f"/api/patients/{self.pid}/whatsapp/compose", {"kind": "document"})[0], 422)
+        status, body = self.call("POST", f"/api/patients/{self.pid}/whatsapp/compose", {"kind": "document", "document_id": doc["data"]["id"], "note": "Please bring it next visit."})
+        self.assertEqual(status, 201, body)
+        self.assertIn("CT chest (", body["data"]["body"])
+        self.assertEqual(body["data"]["template_name"], "oncocare_document")
+        status, sent = self.call("POST", f"/api/whatsapp/messages/{body['data']['id']}/send", {})
+        self.assertEqual((status, sent["data"]["status"], sent["data"]["related_id"]), (200, "sent", doc["data"]["id"]))
+        _, thread = self.call("GET", f"/api/patients/{self.pid}/whatsapp")
+        self.assertEqual([d["title"] for d in thread["data"]["documents"]], ["CT chest"])
+
+    def test_live_reminder_and_document_payloads(self) -> None:
+        """Outside the 24-hour window: template with quick-reply payloads / document header; the payload books the visit."""
+        sent_bodies = []
+        reminder = self.send_reminder_now()
+        with transaction(self.db) as connection:
+            msg = connection.execute("SELECT * FROM whatsapp_messages WHERE id = ?", (reminder["id"],)).fetchone()
+            patient = connection.execute("SELECT * FROM patients WHERE id = ?", (self.pid,)).fetchone()
+            with mock.patch.object(whatsapp, "_graph", side_effect=lambda path, body=None, **k: sent_bodies.append(body) or {"messages": [{"id": "wamid.T"}]}), \
+                    mock.patch.object(whatsapp, "window_open", return_value=False):
+                whatsapp._send_live(connection, msg, patient)
+        template = sent_bodies[0]["template"]
+        self.assertEqual(template["name"], "oncocare_visit_reminder_v2")
+        payloads = [c["parameters"][0]["payload"] for c in template["components"] if c["type"] == "button"]
+        self.assertEqual(payloads, [f"visit_yes:{reminder['id']}", f"visit_no:{reminder['id']}"])
+        # Meta delivers the tap as a "button" message carrying that payload.
+        event = {"entry": [{"changes": [{"value": {"messages": [{"from": "91" + self.phone, "id": "wamid.TAP", "type": "button",
+                                                                 "button": {"payload": payloads[0], "text": "Confirm visit"}}]}}]}]}
+        status, body = self.call("POST", "/api/whatsapp/webhook", event)
+        self.assertEqual(status, 200)
+        _, appts = self.call("GET", f"/api/patients/{self.pid}/appointments")
+        self.assertEqual([a["status"] for a in appts["data"]], ["booked"])
+        # A PDF document goes as the oncocare_document template with the file in the header.
+        import base64
+        _, doc = self.call("POST", f"/api/patients/{self.pid}/documents", {"filename": "scan.pdf", "content_type": "application/pdf", "title": "PET scan",
+                                                                          "data_base64": base64.b64encode(b"%PDF-1.4 x").decode()})
+        _, draft = self.call("POST", f"/api/patients/{self.pid}/whatsapp/compose", {"kind": "document", "document_id": doc["data"]["id"]})
+        sent_bodies.clear()
+        with transaction(self.db) as connection:
+            msg = connection.execute("SELECT * FROM whatsapp_messages WHERE id = ?", (draft["data"]["id"],)).fetchone()
+            patient = connection.execute("SELECT * FROM patients WHERE id = ?", (self.pid,)).fetchone()
+            with mock.patch.object(whatsapp, "_graph", side_effect=lambda path, body=None, **k: sent_bodies.append(body) or {"messages": [{"id": "wamid.D"}]}), \
+                    mock.patch.object(whatsapp, "_upload_media_live", return_value="media-1"), \
+                    mock.patch.object(whatsapp, "window_open", return_value=False):
+                whatsapp._send_live(connection, msg, patient)
+        header = sent_bodies[0]["template"]["components"][0]
+        self.assertEqual((sent_bodies[0]["template"]["name"], header["type"], header["parameters"][0]["document"]),
+                         ("oncocare_document", "header", {"id": "media-1", "filename": "scan.pdf"}))
 
     def test_red_flag_message_creates_report_and_emergency_reply(self) -> None:
         result = self.say("I have high fever and chills since morning")
@@ -329,7 +434,6 @@ class WhatsAppTests(Base):
         self.assertIn("hydrogel", self.last_bot(thread["data"]))
 
     def test_stop_start_and_unknown_number(self) -> None:
-        self.call("POST", f"/api/patients/{self.pid}/whatsapp/consent", {"opt_in": True, "method": "in_clinic_verbal"})
         self.assertEqual(self.say("STOP")["action"], "opt_out")
         _, thread = self.call("GET", f"/api/patients/{self.pid}/whatsapp")
         self.assertEqual(thread["data"]["patient"]["wa_opt_in"], 0)
@@ -510,7 +614,7 @@ class WhatsAppAgentTests(Base):
         self.assertEqual(status, 200, body)
         self.assertEqual([(w["kind"], w["status"]) for w in body["data"]["whatsapp"]],
                          [("discharge", "sent"), ("prescription", "sent"), ("reminder", "scheduled")])
-        # Not opted in: skipped with a reason, nothing sent.
+        # WhatsApp turned off for the patient: skipped with a reason, nothing sent.
         self.call("POST", f"/api/patients/{self.pid}/whatsapp/consent", {"opt_in": False})
         status, body = self.call("PATCH", f"/api/rt-courses/{cid}", {"status": "on_hold", "status_reason": "Skin", "notify_whatsapp": True})
         self.assertEqual(body["data"]["whatsapp"][0]["status"], "skipped")

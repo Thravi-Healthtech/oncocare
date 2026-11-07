@@ -109,6 +109,9 @@ def _routes(ctx: Ctx) -> list[tuple[str, dict[str, Callable[..., Any]]]]:
         (r"/api/patients/(\d+)/whatsapp", {"GET": lambda pid: _ok(whatsapp.patient_thread(db, pid))}),
         (r"/api/patients/(\d+)/whatsapp/consent", {"POST": lambda pid: _ok(whatsapp.set_consent(db, pid, ctx.body(), actor))}),
         (r"/api/patients/(\d+)/whatsapp/compose", {"POST": lambda pid: _ok(whatsapp.compose(db, pid, ctx.body(), actor), 201)}),
+        (r"/api/patients/(\d+)/appointments", {"GET": lambda pid: _ok(whatsapp.appointments(db, pid)),
+                                                "POST": lambda pid: _ok(whatsapp.create_appointment(db, pid, ctx.body(), actor), 201)}),
+        (r"/api/appointments/(\d+)", {"PATCH": lambda aid: _ok(whatsapp.update_appointment(db, aid, ctx.body()))}),
         (r"/api/whatsapp/messages/(\d+)", {
             "PATCH": lambda mid: _ok(whatsapp.edit_draft(db, mid, ctx.body())),
             "DELETE": lambda mid: _ok(whatsapp.cancel(db, mid, actor))}),
@@ -186,7 +189,7 @@ def _with(db: str, fn: Callable[[Any], Any]) -> Any:
 
 
 def dispatch(ctx: Ctx, method: str, path: str) -> Any:
-    if not re.match(r"/api/(rt|rt-|surger|patients/\d+/(rt-courses|surgeries|notes|documents|summary|discharge|whatsapp)|notes/|documents/|discharge-summaries/|whatsapp/)", path):
+    if not re.match(r"/api/(rt|rt-|surger|patients/\d+/(rt-courses|surgeries|notes|documents|summary|discharge|whatsapp|appointments)|notes/|documents/|discharge-summaries/|whatsapp/|appointments/)", path):
         return None
     for pattern, handlers in _routes(ctx):
         match = re.fullmatch(pattern, path)

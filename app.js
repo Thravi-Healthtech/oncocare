@@ -154,7 +154,7 @@ function waResultText(list) {
 }
 function waTick(patient, label) {
   const ok = patient?.wa_opt_in && patient?.phone;
-  return `<label class="confirm-check wa-tick"><input type="checkbox" name="notify_whatsapp" ${ok ? "checked" : ""} ${patient?.phone ? "" : "disabled"} /><span>${esc(label)}${ok ? "" : patient?.phone ? " — patient has not opted in yet; it will be skipped" : " — no mobile number"}</span></label>`;
+  return `<label class="confirm-check wa-tick"><input type="checkbox" name="notify_whatsapp" ${ok ? "checked" : ""} ${patient?.phone ? "" : "disabled"} /><span>${esc(label)}${ok ? "" : patient?.phone ? " — WhatsApp is turned off for this patient; it will be skipped" : " — no mobile number"}</span></label>`;
 }
 function setWaTick(form, label) {
   const holder = $(".wa-tick-holder", form);
