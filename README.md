@@ -89,14 +89,14 @@ Speech-to-text uses the browser's speech service (Chrome, Edge, Safari). Where i
 
 **Sign-in.** Doctors and staff sign in with a hospital username; patients use their mobile number + a temporary password (`ONCOCARE_DEV_PASSWORD`, `1234` locally) until OTP is added. Not secure; for the demo only.
 
-| Username | Account | Password |
-|---|---|---|
-| `chemodoc` | Dr. R. Khanna · Medical oncology | `qwertyui` |
-| `radiodoc` | Dr. P. Rao · Radiation oncology | `qwertyui` |
-| `surgerydoc` | Dr. A. Menon · Surgical oncology | `qwertyui` |
-| `staff` | Hospital staff | `qwertyui` |
+| Username | Account |
+|---|---|
+| `chemodoc` | Dr. R. Khanna · Medical oncology |
+| `radiodoc` | Dr. P. Rao · Radiation oncology |
+| `surgerydoc` | Dr. A. Menon · Surgical oncology |
+| `staff` | Hospital staff |
 
-Accounts are created (or the old Dr. R. Khanna phone account is converted to `chemodoc`) when the database starts. Each has its own salted password hash, set from `ONCOCARE_STAFF_PASSWORD` (default `qwertyui`) only when the account has no password yet.
+Accounts are created (or the old Dr. R. Khanna phone account is converted to `chemodoc`) when the database starts. Each has its own salted password hash, set from `ONCOCARE_STAFF_PASSWORD` only when the account has no password yet. Locally the password defaults to `qwertyui`. A public deployment (`ONCOCARE_PUBLIC=1`) never uses that default: on AWS the password comes from the SSM parameter `/oncocare/staff_password`, which `deploy.sh` creates with a random value.
 - **Doctor / staff:** open http://127.0.0.1:4173/clinician (or **Clinician sign in** on the home page) and sign in with one of the usernames above. All `/api/*` clinician routes require this session. "Recorded by" and "Confirmed by" default to the signed-in account.
 - **Patients:** sign in at `/portal` with the mobile number saved on their record (**Edit patient → Mobile number**; numbers must be unique, and `+91` or a leading 0 is ignored). Demo patients seeded with `--seed` use 9000000018, 9000000031 and 9000000077.
 
