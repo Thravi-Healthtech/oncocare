@@ -58,7 +58,7 @@ function updateWaBadge() {
 /* ------------------------------------------------------------------ render */
 function tick(m) {
   if (m.direction === "in") return "";
-  return { draft: '<span class="tick">draft</span>', scheduled: `<span class="tick">🕑 ${fmtDateTime(m.scheduled_for)}</span>`, sent: '<span class="tick">✓</span>', delivered: '<span class="tick">✓✓</span>',
+  return { draft: '<span class="tick">draft</span>', queued: '<span class="tick">🕑</span>', sending: '<span class="tick">🕑</span>', scheduled: `<span class="tick">🕑 ${fmtDateTime(m.scheduled_for)}</span>`, sent: '<span class="tick">✓</span>', delivered: '<span class="tick">✓✓</span>',
     read: '<span class="tick read">✓✓</span>', failed: `<span class="tick fail" title="${esc(m.error || "")}">✗ failed</span>`, cancelled: '<span class="tick">cancelled</span>' }[m.status] || "";
 }
 const VOICE_LANG = { en: "en-IN", hi: "hi-IN", te: "te-IN" };
