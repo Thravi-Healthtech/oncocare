@@ -475,6 +475,55 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 CREATE INDEX IF NOT EXISTS idx_wa_patient ON whatsapp_messages(patient_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_wa_due ON whatsapp_messages(status, scheduled_for);
 
+CREATE TABLE IF NOT EXISTS cancer_diagnoses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    diagnosis_date TEXT NOT NULL,
+    primary_site TEXT NOT NULL,
+    laterality TEXT,
+    histology TEXT,
+    grade TEXT,
+    method TEXT,
+    tnm_prefix TEXT NOT NULL DEFAULT 'c',
+    t_stage TEXT,
+    n_stage TEXT,
+    m_stage TEXT,
+    stage_group TEXT,
+    staging_system TEXT DEFAULT 'AJCC 8th',
+    intent TEXT,
+    ecog INTEGER CHECK (ecog IS NULL OR ecog BETWEEN 0 AND 4),
+    biomarkers_json TEXT,
+    markers_json TEXT,
+    notes TEXT,
+    recorded_by TEXT,
+    updated_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cancer_diagnoses_patient ON cancer_diagnoses(patient_id);
+
+CREATE TABLE IF NOT EXISTS tumour_assessments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    diagnosis_id INTEGER REFERENCES cancer_diagnoses(id) ON DELETE SET NULL,
+    assessment_date TEXT NOT NULL,
+    modality TEXT NOT NULL,
+    timepoint TEXT NOT NULL,
+    cycle_label TEXT,
+    lesions_json TEXT NOT NULL,
+    markers_json TEXT,
+    new_lesions INTEGER NOT NULL DEFAULT 0,
+    findings TEXT,
+    response_override TEXT,
+    response_note TEXT,
+    document_id INTEGER REFERENCES patient_documents(id) ON DELETE SET NULL,
+    recorded_by TEXT,
+    updated_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tumour_assessments_patient ON tumour_assessments(patient_id, assessment_date);
+
 CREATE TABLE IF NOT EXISTS prescriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
@@ -1093,6 +1142,56 @@ def _seed_ananya_rt(connection: sqlite3.Connection, now: str) -> None:
                        (course_id, f"Completed as planned: 50 Gy in 25 fractions, {dates[0]} to {dates[-1]}", "Dr. P. Rao", now))
 
 
+def _seed_oncology(connection: sqlite3.Connection, now: str) -> None:
+    """Diagnosis, staging and tumour measurements for the demo patients that do not have them yet (synthetic data)."""
+    from datetime import date as _date, timedelta as _td
+    ago = lambda days: (_date.today() - _td(days=days)).isoformat()  # noqa: E731
+    lesion = lambda loc, size, kind="target", node=False, status=None: {"location": loc, "kind": kind, "node": node, "size_mm": size, "status": status, "key": loc.lower()}  # noqa: E731
+    demo = {
+        "HN-24018": ({"diagnosis_date": "2026-08-20", "primary_site": "Cervix", "laterality": "na", "histology": "Squamous cell carcinoma", "grade": "2",
+                      "method": "Punch biopsy + MRI pelvis", "tnm_prefix": "c", "t_stage": "3b", "n_stage": "0", "m_stage": "0", "stage_group": "IIIB",
+                      "staging_system": "FIGO 2018", "intent": "curative", "ecog": 1, "biomarkers": [{"name": "p16", "value": "positive"}],
+                      "markers": [{"name": "SCC-Ag", "value": "6.2", "unit": "ng/mL"}]},
+                     [("2026-08-28", "mri", "baseline", None, [lesion("Cervix (primary)", 52), lesion("Left parametrium", None, "non_target", status="present")], [("SCC-Ag", "6.2", "ng/mL")], "Bulky cervical mass with left parametrial extension; no hydronephrosis."),
+                      ("2026-09-29", "mri", "during", "After 15 fractions", [lesion("Cervix (primary)", 31), lesion("Left parametrium", None, "non_target", status="present")], [("SCC-Ag", "2.4", "ng/mL")], "Marked reduction of the cervical mass."),
+                      ("2026-11-02", "mri", "end", "6 weeks after chemo-RT", [lesion("Cervix (primary)", 9), lesion("Left parametrium", None, "non_target", status="absent")], [("SCC-Ag", "1.1", "ng/mL")], "Small residual cervical lesion; parametrium clear.")]),
+        "HN-24031": ({"diagnosis_date": "2026-08-05", "primary_site": "Lung", "laterality": "right", "histology": "Adenocarcinoma", "grade": None,
+                      "method": "CT-guided core biopsy", "tnm_prefix": "c", "t_stage": "2b", "n_stage": "2", "m_stage": "1a", "stage_group": "IVA",
+                      "staging_system": "AJCC 8th", "intent": "palliative", "ecog": 1,
+                      "biomarkers": [{"name": "EGFR", "value": "not detected"}, {"name": "ALK", "value": "negative"}, {"name": "PD-L1 TPS", "value": "30%"}],
+                      "markers": [{"name": "CEA", "value": "18.4", "unit": "ng/mL"}]},
+                     [("2026-08-12", "ct", "baseline", None, [lesion("Right upper lobe mass", 48), lesion("Subcarinal node", 22, node=True), lesion("Right pleural effusion", None, "non_target", status="present")], [("CEA", "18.4", "ng/mL")], "RUL mass with mediastinal nodes and malignant right effusion."),
+                      ("2026-10-01", "ct", "during", "After cycle 2", [lesion("Right upper lobe mass", 41), lesion("Subcarinal node", 17, node=True), lesion("Right pleural effusion", None, "non_target", status="present")], [("CEA", "12.1", "ng/mL")], "Mild reduction; effusion smaller.")]),
+        "HN-24077": ({"diagnosis_date": "2026-07-22", "primary_site": "Oropharynx (tonsil)", "laterality": "left", "histology": "Squamous cell carcinoma",
+                      "grade": "2", "method": "Biopsy under GA + PET-CT", "tnm_prefix": "c", "t_stage": "3", "n_stage": "1", "m_stage": "0", "stage_group": "III",
+                      "staging_system": "AJCC 8th", "intent": "curative", "ecog": 0, "biomarkers": [{"name": "p16", "value": "negative"}], "markers": []},
+                     [("2026-07-28", "pet_ct", "baseline", None, [lesion("Left tonsil (primary)", 38), lesion("Left level II node", 24, node=True)], [], "FDG-avid left tonsillar mass with a single ipsilateral level II node.")]),
+        "HN-24102": ({"diagnosis_date": ago(110), "primary_site": "Breast", "laterality": "right", "histology": "Invasive ductal carcinoma", "grade": "2",
+                      "method": "Ultrasound-guided core biopsy", "tnm_prefix": "c", "t_stage": "2", "n_stage": "1", "m_stage": "0", "stage_group": "IIB",
+                      "staging_system": "AJCC 8th", "intent": "curative", "ecog": 0,
+                      "biomarkers": [{"name": "ER", "value": "positive (90%)"}, {"name": "PR", "value": "positive (60%)"}, {"name": "HER2", "value": "negative (IHC 1+)"}, {"name": "Ki-67", "value": "18%"}],
+                      "markers": [{"name": "CA 15-3", "value": "28", "unit": "U/mL"}]},
+                     [(ago(104), "usg", "baseline", None, [lesion("Right breast, upper outer quadrant", 32), lesion("Right axillary node", 16, node=True)], [("CA 15-3", "28", "U/mL")], "Irregular hypoechoic mass with one suspicious axillary node.")]),
+    }
+    for mrn, (diag, scans) in demo.items():
+        patient = connection.execute("SELECT id FROM patients WHERE medical_record_number = ?", (mrn,)).fetchone()
+        if not patient or connection.execute("SELECT 1 FROM cancer_diagnoses WHERE patient_id = ?", (patient["id"],)).fetchone():
+            continue
+        diag_id = connection.execute(
+            """INSERT INTO cancer_diagnoses (patient_id, diagnosis_date, primary_site, laterality, histology, grade, method, tnm_prefix, t_stage, n_stage, m_stage,
+                   stage_group, staging_system, intent, ecog, biomarkers_json, markers_json, recorded_by, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (patient["id"], diag["diagnosis_date"], diag["primary_site"], diag["laterality"], diag["histology"], diag["grade"], diag["method"], diag["tnm_prefix"],
+             diag["t_stage"], diag["n_stage"], diag["m_stage"], diag["stage_group"], diag["staging_system"], diag["intent"], diag["ecog"],
+             json.dumps(diag["biomarkers"]), json.dumps([dict(m) for m in diag["markers"]]), CLINICIAN, now, now)).lastrowid
+        for day, modality, timepoint, label, lesions, markers, findings in scans:
+            connection.execute(
+                """INSERT INTO tumour_assessments (patient_id, diagnosis_id, assessment_date, modality, timepoint, cycle_label, lesions_json, markers_json,
+                       new_lesions, findings, recorded_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)""",
+                (patient["id"], diag_id, day, modality, timepoint, label, json.dumps(lesions),
+                 json.dumps([{"name": n, "value": v, "unit": u} for n, v, u in markers]), findings, CLINICIAN, now, now))
+
+
 DEMO_PATIENTS = [("HN-24018", _seed_ananya), ("HN-24031", _seed_rahul), ("HN-24077", _seed_priya), ("HN-24102", _seed_lakshmi)]
 
 
@@ -1107,3 +1206,4 @@ def seed_demo(db_path: str | Path) -> None:
             if phone and not connection.execute("SELECT 1 FROM patients WHERE phone = ?", (phone,)).fetchone():
                 connection.execute("UPDATE patients SET phone = ? WHERE medical_record_number = ? AND phone IS NULL", (phone, mrn))
         _seed_ananya_rt(connection, now)
+        _seed_oncology(connection, now)

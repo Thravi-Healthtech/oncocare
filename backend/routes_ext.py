@@ -37,7 +37,7 @@ def _ok(data: Any, status: int = 200) -> tuple[dict[str, Any], int]:
 
 
 def _routes(ctx: Ctx) -> list[tuple[str, dict[str, Callable[..., Any]]]]:
-    from . import records, discharge, prescriptions, scribe, whatsapp  # noqa: F401  (imported lazily to keep start-up light)
+    from . import records, discharge, oncology, prescriptions, scribe, whatsapp  # noqa: F401  (imported lazily to keep start-up light)
     db, actor = ctx.db, ctx.actor
     return [
         # Radiation oncology
@@ -109,6 +109,12 @@ def _routes(ctx: Ctx) -> list[tuple[str, dict[str, Callable[..., Any]]]]:
         (r"/api/patients/(\d+)/whatsapp", {"GET": lambda pid: _ok(whatsapp.patient_thread(db, pid))}),
         (r"/api/patients/(\d+)/whatsapp/consent", {"POST": lambda pid: _ok(whatsapp.set_consent(db, pid, ctx.body(), actor))}),
         (r"/api/patients/(\d+)/whatsapp/compose", {"POST": lambda pid: _ok(whatsapp.compose(db, pid, ctx.body(), actor), 201)}),
+        (r"/api/patients/(\d+)/oncology", {"GET": lambda pid: _ok(oncology.overview(db, pid))}),
+        (r"/api/patients/(\d+)/diagnoses", {"POST": lambda pid: _ok(oncology.create_diagnosis(db, pid, ctx.body(), actor), 201)}),
+        (r"/api/diagnoses/(\d+)", {"PATCH": lambda did: _ok(oncology.update_diagnosis(db, did, ctx.body(), actor))}),
+        (r"/api/patients/(\d+)/tumour-assessments", {"POST": lambda pid: _ok(oncology.create_assessment(db, pid, ctx.body(), actor), 201)}),
+        (r"/api/tumour-assessments/(\d+)", {"PATCH": lambda aid: _ok(oncology.update_assessment(db, aid, ctx.body(), actor)),
+                                             "DELETE": lambda aid: _ok(oncology.delete_assessment(db, aid))}),
         (r"/api/patients/(\d+)/prescriptions", {"GET": lambda pid: _ok(prescriptions.list_for_patient(db, pid)),
                                                  "POST": lambda pid: _ok(_rx_notify(ctx, pid), 201)}),
         (r"/api/prescriptions/(\d+)", {"GET": lambda rid: _ok(prescriptions.get(db, rid))}),
@@ -206,7 +212,7 @@ def _with(db: str, fn: Callable[[Any], Any]) -> Any:
 
 
 def dispatch(ctx: Ctx, method: str, path: str) -> Any:
-    if not re.match(r"/api/(rt|rt-|surger|patients/\d+/(rt-courses|surgeries|notes|documents|summary|discharge|whatsapp|appointments|prescriptions)|notes/|documents/|discharge-summaries/|whatsapp/|appointments/|prescriptions/|scribe/)", path):
+    if not re.match(r"/api/(rt|rt-|surger|patients/\d+/(rt-courses|surgeries|notes|documents|summary|discharge|whatsapp|appointments|prescriptions|oncology|diagnoses|tumour-assessments)|diagnoses/|tumour-assessments/|notes/|documents/|discharge-summaries/|whatsapp/|appointments/|prescriptions/|scribe/)", path):
         return None
     for pattern, handlers in _routes(ctx):
         match = re.fullmatch(pattern, path)
