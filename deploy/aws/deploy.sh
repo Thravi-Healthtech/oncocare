@@ -161,7 +161,7 @@ for i in $(seq 1 30); do
 done
 [ "${OK:-}" = 1 ] && say "Live: https://$DOMAIN" || echo "   Not reachable over HTTPS yet - DNS may still be propagating. Try https://$DOMAIN in a few minutes."
 echo
-echo "   Demo sign-in password (clinician and patient portal):"
+echo "   Patient portal password:"
 echo "     $(aws ssm get-parameter --name /oncocare/demo_password --with-decryption --query Parameter.Value --output text)"
-echo "   Clinician test account: 8008475309"
+echo "   Clinician sign-in: radiodoc / chemodoc / surgerydoc / staff, password qwertyui"
 echo "   Server shell (needs session-manager-plugin): aws ssm start-session --region $REGION --target $INSTANCE"

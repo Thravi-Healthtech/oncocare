@@ -51,9 +51,9 @@ class PublicModeTest(unittest.TestCase):
     def test_public_mode_sets_secure_cookie_and_locks_ai_settings(self) -> None:
         env = {"ONCOCARE_PUBLIC": "1", "ONCOCARE_DEV_PASSWORD": "a-strong-demo-pass"}
         with mock.patch.dict(os.environ, env):
-            status, _, _ = self.request("POST", "/api/auth/login", {"phone": "8008475309", "password": "1234"})
-            self.assertEqual(status, 401)
-            status, headers, _ = self.request("POST", "/api/auth/login", {"phone": "8008475309", "password": "a-strong-demo-pass"})
+            status, _, _ = self.request("POST", "/api/auth/login", {"username": "chemodoc", "password": "a-strong-demo-pass"})
+            self.assertEqual(status, 401)  # the patient-portal password does not open clinician accounts
+            status, headers, _ = self.request("POST", "/api/auth/login", {"username": "chemodoc", "password": "qwertyui"})
             self.assertEqual(status, 200)
             cookie = headers["Set-Cookie"]
             self.assertIn("Secure", cookie)
@@ -64,7 +64,7 @@ class PublicModeTest(unittest.TestCase):
 
     def test_local_mode_cookie_is_not_secure(self) -> None:
         with mock.patch.dict(os.environ, {"ONCOCARE_PUBLIC": "", "ONCOCARE_DEV_PASSWORD": "1234"}):
-            status, headers, _ = self.request("POST", "/api/auth/login", {"phone": "8008475309", "password": "1234"})
+            status, headers, _ = self.request("POST", "/api/auth/login", {"username": "chemodoc", "password": "qwertyui"})
             self.assertEqual(status, 200)
             self.assertNotIn("Secure", headers["Set-Cookie"])
 

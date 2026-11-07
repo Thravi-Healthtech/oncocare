@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import secrets
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -496,10 +499,19 @@ ADDED_COLUMNS = {
                  ("wa_opt_in_at", "TEXT"), ("wa_opt_in_method", "TEXT")],
     "patient_reports": [("checkin_json", "TEXT"), ("ui_language", "TEXT"), ("source", "TEXT NOT NULL DEFAULT 'portal'")],
     "whatsapp_messages": [("meta_json", "TEXT")],
+    "clinicians": [("username", "TEXT"), ("role", "TEXT NOT NULL DEFAULT 'doctor'"), ("password_hash", "TEXT"), ("password_salt", "TEXT")],
 }
 
-# Development clinician account (password comes from ONCOCARE_DEV_PASSWORD until OTP login is added).
-DEV_CLINICIANS = [("Dr. R. Khanna", "8008475309", "Medical oncology")]
+# Hospital sign-in accounts: (username, display name, contact phone, specialty, role).
+# chemodoc is the original Dr. R. Khanna account (phone 8008475309); the others use the names on the demo records.
+# Each gets STAFF_DEFAULT_PASSWORD (or ONCOCARE_STAFF_PASSWORD) the first time it is created; a stored password is never reset.
+STAFF_ACCOUNTS = [
+    ("chemodoc", "Dr. R. Khanna", "8008475309", "Medical oncology", "doctor"),
+    ("radiodoc", "Dr. P. Rao", "9000000201", "Radiation oncology", "doctor"),
+    ("surgerydoc", "Dr. A. Menon", "9000000202", "Surgical oncology", "doctor"),
+    ("staff", "Hospital staff", "9000000203", "Staff", "staff"),
+]
+STAFF_DEFAULT_PASSWORD = "qwertyui"
 DEMO_PHONES = {"HN-24018": "9000000018", "HN-24031": "9000000031", "HN-24077": "9000000077", "HN-24102": "9000000102"}
 
 
@@ -513,6 +525,28 @@ def normalise_phone(value: object) -> str | None:
     return digits or None
 
 CLINICIAN = "Dr. R. Khanna"
+
+
+def hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
+    salt = salt or secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), 200_000).hex()
+    return digest, salt
+
+
+def _seed_staff_accounts(connection: sqlite3.Connection) -> None:
+    password = os.environ.get("ONCOCARE_STAFF_PASSWORD") or STAFF_DEFAULT_PASSWORD
+    for username, name, phone, specialty, role in STAFF_ACCOUNTS:
+        row = connection.execute("SELECT id FROM clinicians WHERE username = ?", (username,)).fetchone() \
+            or connection.execute("SELECT id FROM clinicians WHERE phone = ? AND username IS NULL", (phone,)).fetchone()
+        if row:
+            connection.execute("UPDATE clinicians SET username = ?, name = ?, specialty = ?, role = ? WHERE id = ?",
+                               (username, name, specialty, role, row["id"]))
+        else:
+            connection.execute("""INSERT INTO clinicians (username, name, phone, specialty, role, active, created_at)
+                                  VALUES (?, ?, ?, ?, ?, 1, ?)""", (username, name, phone, specialty, role, utc_now()))
+    for row in connection.execute("SELECT id FROM clinicians WHERE password_hash IS NULL").fetchall():
+        digest, salt = hash_password(password)
+        connection.execute("UPDATE clinicians SET password_hash = ?, password_salt = ? WHERE id = ?", (digest, salt, row["id"]))
 
 
 def utc_now() -> str:
@@ -544,10 +578,8 @@ def migrate(db_path: str | Path) -> None:
                 if name not in existing:
                     connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
         connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_phone ON patients(phone) WHERE phone IS NOT NULL")
-        for name, phone, specialty in DEV_CLINICIANS:
-            connection.execute(
-                "INSERT OR IGNORE INTO clinicians (name, phone, specialty, active, created_at) VALUES (?, ?, ?, 1, ?)",
-                (name, phone, specialty, utc_now()))
+        connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clinicians_username ON clinicians(username) WHERE username IS NOT NULL")
+        _seed_staff_accounts(connection)
         # Normalise legacy cycle statuses and backfill per-drug rows for single-drug cycles.
         connection.execute("UPDATE treatment_cycles SET status = 'given' WHERE status IN ('administered', 'completed')")
         legacy = connection.execute(
