@@ -475,6 +475,27 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 CREATE INDEX IF NOT EXISTS idx_wa_patient ON whatsapp_messages(patient_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_wa_due ON whatsapp_messages(status, scheduled_for);
 
+CREATE TABLE IF NOT EXISTS prescriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    rx_date TEXT NOT NULL,
+    context TEXT NOT NULL DEFAULT 'consultation',
+    indication TEXT,
+    items_json TEXT NOT NULL,
+    advice TEXT,
+    consult_notes TEXT,
+    transcript TEXT,
+    source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'conversation')),
+    treatment_plan_id INTEGER REFERENCES treatment_plans(id) ON DELETE SET NULL,
+    prescribed_by TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled')),
+    cancel_reason TEXT,
+    cancelled_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_patient ON prescriptions(patient_id, rx_date);
+
 CREATE TABLE IF NOT EXISTS appointments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,

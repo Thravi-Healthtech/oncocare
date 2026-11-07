@@ -105,7 +105,7 @@ def _build(connection: sqlite3.Connection, patient_id: int, period_from: str, pe
 
 ACTIVITY_LABEL = {"chemo": "Chemotherapy", "rt": "Radiotherapy", "rt_review": "Radiotherapy review", "surgery": "Surgery", "surgery_note": "Post-operative",
                   "toxicity": "Toxicity (CTCAE)", "labs": "Investigations", "complaint": "Patient message", "note": "Clinical note", "document": "Report",
-                  "discharge": "Summary"}
+                  "discharge": "Summary", "prescription": "Prescription"}
 
 
 def activity_key(item: dict[str, Any]) -> str:

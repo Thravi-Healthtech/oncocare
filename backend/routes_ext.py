@@ -37,7 +37,7 @@ def _ok(data: Any, status: int = 200) -> tuple[dict[str, Any], int]:
 
 
 def _routes(ctx: Ctx) -> list[tuple[str, dict[str, Callable[..., Any]]]]:
-    from . import records, discharge, whatsapp  # noqa: F401  (imported lazily to keep start-up light)
+    from . import records, discharge, prescriptions, scribe, whatsapp  # noqa: F401  (imported lazily to keep start-up light)
     db, actor = ctx.db, ctx.actor
     return [
         # Radiation oncology
@@ -109,6 +109,14 @@ def _routes(ctx: Ctx) -> list[tuple[str, dict[str, Callable[..., Any]]]]:
         (r"/api/patients/(\d+)/whatsapp", {"GET": lambda pid: _ok(whatsapp.patient_thread(db, pid))}),
         (r"/api/patients/(\d+)/whatsapp/consent", {"POST": lambda pid: _ok(whatsapp.set_consent(db, pid, ctx.body(), actor))}),
         (r"/api/patients/(\d+)/whatsapp/compose", {"POST": lambda pid: _ok(whatsapp.compose(db, pid, ctx.body(), actor), 201)}),
+        (r"/api/patients/(\d+)/prescriptions", {"GET": lambda pid: _ok(prescriptions.list_for_patient(db, pid)),
+                                                 "POST": lambda pid: _ok(_rx_notify(ctx, pid), 201)}),
+        (r"/api/prescriptions/(\d+)", {"GET": lambda rid: _ok(prescriptions.get(db, rid))}),
+        (r"/api/patients/(\d+)/prescriptions/draft", {"POST": lambda pid: _ok(scribe.draft_prescription(db, pid, ctx.body()))}),
+        (r"/api/scribe/status", {"GET": lambda: _ok(scribe.status())}),
+        (r"/api/scribe/transcribe", {"POST": lambda: _ok(scribe.transcribe_segment(ctx.body(6_000_000)))}),
+        (r"/api/prescriptions/(\d+)/cancel", {"POST": lambda rid: _ok(prescriptions.cancel(db, rid, ctx.body(), actor))}),
+        (r"/api/prescriptions/(\d+)/print", {"GET": lambda rid: RawResponse(prescriptions.print_html(db, rid).encode(), "text/html; charset=utf-8")}),
         (r"/api/patients/(\d+)/appointments", {"GET": lambda pid: _ok(whatsapp.appointments(db, pid)),
                                                 "POST": lambda pid: _ok(whatsapp.create_appointment(db, pid, ctx.body(), actor), 201)}),
         (r"/api/appointments/(\d+)", {"PATCH": lambda aid: _ok(whatsapp.update_appointment(db, aid, ctx.body()))}),
@@ -165,6 +173,15 @@ def _sx_discharge(ctx: Ctx, case_id: int) -> dict[str, Any]:
     return data
 
 
+def _rx_notify(ctx: Ctx, patient_id: int) -> dict[str, Any]:
+    from . import prescriptions, whatsapp
+    body = ctx.body()
+    data = prescriptions.create(ctx.db, patient_id, body, ctx.actor)
+    if body.get("notify_whatsapp"):
+        data["whatsapp"] = [whatsapp.notify(ctx.db, patient_id, "prescription", ctx.actor, prescription_id=data["id"])]
+    return data
+
+
 def _finalise_notify(ctx: Ctx, summary_id: int) -> dict[str, Any]:
     """Finalising sends the summary, the prescription and a follow-up reminder when notify_whatsapp is set."""
     from . import discharge, whatsapp
@@ -189,7 +206,7 @@ def _with(db: str, fn: Callable[[Any], Any]) -> Any:
 
 
 def dispatch(ctx: Ctx, method: str, path: str) -> Any:
-    if not re.match(r"/api/(rt|rt-|surger|patients/\d+/(rt-courses|surgeries|notes|documents|summary|discharge|whatsapp|appointments)|notes/|documents/|discharge-summaries/|whatsapp/|appointments/)", path):
+    if not re.match(r"/api/(rt|rt-|surger|patients/\d+/(rt-courses|surgeries|notes|documents|summary|discharge|whatsapp|appointments|prescriptions)|notes/|documents/|discharge-summaries/|whatsapp/|appointments/|prescriptions/|scribe/)", path):
         return None
     for pattern, handlers in _routes(ctx):
         match = re.fullmatch(pattern, path)

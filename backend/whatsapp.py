@@ -27,7 +27,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from . import agent, portal, questionnaire, speech, voice_answers
+from . import agent, portal, prescriptions, questionnaire, speech, voice_answers
 from . import radiotherapy as rt
 from .database import normalise_phone, row_or_none, rows, transaction, utc_now
 from .errors import ApiError
@@ -381,6 +381,20 @@ def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> di
             plan = _plan_text(connection, patient, lang)
             body = f"Hello {name}, here is your treatment plan from {clinic()}:\n\n{plan}\n\nReply to this message if you have symptoms or questions. In an emergency call 112."
             params = [name, clinic(), _one_line(plan)]
+        elif kind == "prescription" and (payload.get("prescription_id") or not payload.get("summary_id")) and \
+                row_or_none(connection, "SELECT 1 FROM prescriptions WHERE patient_id = ? AND status = 'active'", (patient_id,)):
+            rx_row = row_or_none(connection, "SELECT * FROM prescriptions WHERE id = ? AND patient_id = ? AND status = 'active'",
+                                 (payload.get("prescription_id"), patient_id)) if payload.get("prescription_id") else None
+            rx = prescriptions._view(rx_row) if rx_row else prescriptions.latest_active(connection, patient_id)
+            if payload.get("prescription_id") and not rx_row:
+                raise ApiError(422, "That prescription is not active")
+            doctor = rx["prescribed_by"] or actor
+            meds = rx["items"]
+            advice = f"\n\nAdvice: {rx['advice']}" if rx.get("advice") else ""
+            body = (f"Hello {name}, here are the medicines prescribed by {doctor} for you on {_fmt_day(rx['rx_date'])}:\n\n{_medicines_text(meds)}{advice}"
+                    "\n\nTake them as advised and reply here if you have questions.")
+            params = [name, doctor, _one_line(_medicines_text(meds) + (f"; Advice: {rx['advice']}" if rx.get("advice") else ""))]
+            related_type, related_id = "prescription", rx["id"]
         elif kind == "prescription":
             summary = _final_summary(connection, patient_id, payload.get("summary_id"))
             content = json.loads(summary["content_json"])
@@ -738,6 +752,8 @@ def patient_thread(db: str, patient_id: int) -> dict[str, Any]:
         return {"patient": {k: patient[k] for k in ("id", "first_name", "last_name", "medical_record_number", "phone", "preferred_language",
                                                      "wa_opt_in", "wa_opt_in_at", "wa_opt_in_method")} | {"wa_number": wa_number(patient["phone"])},
                 "messages": messages, "window_open": window_open(connection, patient_id), "session": session, "final_summaries": summaries,
+                "prescriptions": rows(connection, "SELECT id, rx_date, prescribed_by, context FROM prescriptions WHERE patient_id = ? AND status = 'active' "
+                                                  "ORDER BY rx_date DESC, id DESC", (patient_id,)),
                 "documents": rows(connection, "SELECT id, title, doc_date, doc_type, filename, content_type FROM patient_documents WHERE patient_id = ? "
                                               "ORDER BY doc_date DESC, id DESC", (patient_id,)),
                 "appointments": [_appt_view(r) for r in rows(connection, "SELECT * FROM appointments WHERE patient_id = ? ORDER BY appt_date DESC, id DESC", (patient_id,))],
@@ -915,6 +931,10 @@ def record_facts(connection: sqlite3.Connection, patient: dict[str, Any]) -> str
             lines.append(f"Follow-up visit: {_fmt_day(fu['date'])}" + (f" with {fu['with']}" if fu.get("with") else ""))
         if content.get("advice"):
             lines.append(f"Doctor's written advice (quote only): {content['advice']}")
+    rx = prescriptions.latest_active(connection, patient["id"])
+    if rx:
+        lines.append(f"Latest prescription ({rx['rx_date']}, {rx['prescribed_by']}; quote exactly):\n" + _medicines_text(rx["items"])
+                     + (f"\nAdvice: {rx['advice']}" if rx.get("advice") else ""))
     for r in rows(connection, "SELECT body, scheduled_for FROM whatsapp_messages WHERE patient_id = ? AND kind = 'reminder' AND status IN ('scheduled', 'sent') "
                               "ORDER BY scheduled_for DESC LIMIT 2", (patient["id"],)):
         lines.append(f"Visit reminder on record: {r['body'][:200]}")

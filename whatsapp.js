@@ -134,7 +134,7 @@ function renderWa() {
           <button class="button secondary" data-wa-share="reminder" data-patient="${p.id}">Follow-up reminder</button>
           <button class="button secondary" data-wa-share="document" data-patient="${p.id}" ${t.documents?.length ? "" : "disabled title=\"Upload a document in the running summary first\""}>Document</button>
           <button class="button secondary" data-wa-share="discharge" data-patient="${p.id}" ${t.final_summaries.length ? "" : "disabled title=\"Finalise a discharge summary first\""}>Discharge summary</button>
-          <button class="button secondary" data-wa-share="prescription" data-patient="${p.id}" ${t.final_summaries.length ? "" : "disabled title=\"Finalise a discharge summary with medicines first\""}>Prescription</button>
+          <button class="button secondary" data-wa-share="prescription" data-patient="${p.id}" ${t.final_summaries.length || t.prescriptions?.length ? "" : "disabled title=\"Write a prescription in the patient record first\""}>Prescription</button>
           <button class="button secondary" data-wa-share="message" data-patient="${p.id}">Free-text message</button>
         </div>
       </article>
@@ -184,6 +184,17 @@ async function startShare(kind, opts) {
   if (kind === "message") {
     return waModal("Message the patient", `${name}${thread.window_open ? "" : " · outside the 24-hour window (live mode needs a template)"}`, `<label class="field"><span>Message</span><textarea name="text" rows="5" maxlength="3500" required></textarea></label>`, "Preview message");
   }
+  if (kind === "prescription" && !opts.summary) {
+    if (opts.prescription) return composeNow({ prescription_id: opts.prescription });
+    const rx = thread.prescriptions || [];
+    const withMeds = thread.final_summaries;
+    if (rx.length + withMeds.length > 1) {
+      return waModal("Send a prescription", name, `<label class="field"><span>Prescription</span><select name="rx_choice">
+        ${rx.map(r => `<option value="rx:${r.id}">Prescription · ${fmtDate(r.rx_date)} · ${esc(r.prescribed_by)}</option>`).join("")}
+        ${withMeds.map(s => `<option value="ds:${s.id}">Medicines in ${esc(s.kind.replace("_", " "))} · finalised ${fmtDate(s.finalised_at)}</option>`).join("")}</select></label>`, "Preview message");
+    }
+    if (rx.length) return composeNow({ prescription_id: rx[0].id });
+  }
   if ((kind === "discharge" || kind === "prescription") && !opts.summary && thread.final_summaries.length > 1) {
     return waModal(WA_KIND[kind], name, `<label class="field"><span>Summary</span><select name="summary_id">${thread.final_summaries.map(s => `<option value="${s.id}">${esc(s.kind.replace("_", " "))} · finalised ${fmtDate(s.finalised_at)}</option>`).join("")}</select></label>`, "Preview message");
   }
@@ -216,6 +227,7 @@ $("#waForm").addEventListener("submit", async event => {
       }
       if (c.kind === "document") return composeNow({ document_id: f.document_id.value, note: f.note.value });
       if (c.kind === "message") return composeNow({ text: f.text.value });
+      if (f.rx_choice) { const [t, id] = f.rx_choice.value.split(":"); return composeNow(t === "rx" ? { prescription_id: id } : { summary_id: id }); }
       return composeNow({ summary_id: f.summary_id?.value || null });
     }
     if (!f.approve.checked) throw new Error("Tick the approval box to send.");
@@ -350,7 +362,7 @@ document.addEventListener("click", async event => {
   const share = event.target.closest("[data-wa-share]");
   if (share) {
     event.preventDefault();
-    try { await startShare(share.dataset.waShare, { patient: share.dataset.patient, summary: share.dataset.summary, visit: share.dataset.visit, with: share.dataset.with }); }
+    try { await startShare(share.dataset.waShare, { patient: share.dataset.patient, summary: share.dataset.summary, prescription: share.dataset.prescription, visit: share.dataset.visit, with: share.dataset.with }); }
     catch (e) { showToast(e.message); }
     return;
   }

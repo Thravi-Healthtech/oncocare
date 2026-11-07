@@ -443,6 +443,11 @@ def collect(connection: sqlite3.Connection, patient_id: int, period_from: str | 
     notes = rows(connection, "SELECT * FROM clinical_notes WHERE patient_id = ? ORDER BY note_date, id", (patient_id,))
     for note in notes:
         add(note["note_date"], "note", f"{NOTE_CATEGORIES.get(note['category'], 'Note')} — {note['author']}", note["text"], {"type": "note", "id": note["id"]})
+    for rx in rows(connection, "SELECT * FROM prescriptions WHERE patient_id = ? AND status = 'active' ORDER BY rx_date, id", (patient_id,)):
+        meds = json.loads(rx["items_json"] or "[]")
+        detail = "; ".join(" ".join(x for x in (m["name"], m.get("dose"), m.get("frequency"), f"for {m['duration']}" if m.get("duration") else "") if x) for m in meds)
+        add(rx["rx_date"], "prescription", f"Prescription — {rx['prescribed_by']}", detail + (f". Advice: {rx['advice']}" if rx["advice"] else ""),
+            {"type": "prescription", "id": rx["id"]})
     documents = rows(connection, "SELECT * FROM patient_documents WHERE patient_id = ? ORDER BY doc_date, id", (patient_id,))
     for doc in documents:
         add(doc["doc_date"], "document", f"{DOC_TYPES.get(doc['doc_type'], 'Report')}: {doc['title']}",
