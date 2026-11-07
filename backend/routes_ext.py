@@ -103,6 +103,7 @@ def _routes(ctx: Ctx) -> list[tuple[str, dict[str, Callable[..., Any]]]]:
         (r"/api/discharge-summaries/(\d+)/finalise", {"POST": lambda sid: _ok(_finalise_notify(ctx, sid))}),
         (r"/api/discharge-summaries/(\d+)/revise", {"POST": lambda sid: _ok(discharge.revise(db, sid, actor), 201)}),
         (r"/api/discharge-summaries/(\d+)/print", {"GET": lambda sid: RawResponse(discharge.print_html(db, sid).encode(), "text/html; charset=utf-8")}),
+        (r"/api/discharge-summaries/(\d+)/pdf", {"GET": lambda sid: _pdf(db, "discharge", sid)}),
         # WhatsApp
         (r"/api/whatsapp/status", {"GET": lambda: _ok(whatsapp.status())}),
         (r"/api/whatsapp/threads", {"GET": lambda: _ok(whatsapp.threads(db))}),
@@ -123,6 +124,7 @@ def _routes(ctx: Ctx) -> list[tuple[str, dict[str, Callable[..., Any]]]]:
         (r"/api/scribe/transcribe", {"POST": lambda: _ok(scribe.transcribe_segment(ctx.body(6_000_000)))}),
         (r"/api/prescriptions/(\d+)/cancel", {"POST": lambda rid: _ok(prescriptions.cancel(db, rid, ctx.body(), actor))}),
         (r"/api/prescriptions/(\d+)/print", {"GET": lambda rid: RawResponse(prescriptions.print_html(db, rid).encode(), "text/html; charset=utf-8")}),
+        (r"/api/prescriptions/(\d+)/pdf", {"GET": lambda rid: _pdf(db, "prescription", rid)}),
         (r"/api/patients/(\d+)/appointments", {"GET": lambda pid: _ok(whatsapp.appointments(db, pid)),
                                                 "POST": lambda pid: _ok(whatsapp.create_appointment(db, pid, ctx.body(), actor), 201)}),
         (r"/api/appointments/(\d+)", {"PATCH": lambda aid: _ok(whatsapp.update_appointment(db, aid, ctx.body()))}),
@@ -186,6 +188,16 @@ def _rx_notify(ctx: Ctx, patient_id: int) -> dict[str, Any]:
     if body.get("notify_whatsapp"):
         data["whatsapp"] = [whatsapp.notify(ctx.db, patient_id, "prescription", ctx.actor, prescription_id=data["id"])]
     return data
+
+
+def _pdf(db: str, kind: str, record_id: int) -> RawResponse:
+    """The same PDF the patient receives on WhatsApp, for download from the clinician app."""
+    import re as _re
+    from . import pdfs
+    from .database import transaction
+    with transaction(db) as connection:
+        data, name = (pdfs.discharge_pdf if kind == "discharge" else pdfs.prescription_pdf)(connection, record_id)
+    return RawResponse(data, "application/pdf", _re.sub(r"[^A-Za-z0-9 ._-]", "", name) or "document.pdf")
 
 
 def _finalise_notify(ctx: Ctx, summary_id: int) -> dict[str, Any]:

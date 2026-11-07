@@ -364,6 +364,18 @@ def _parse_send_at(value: Any) -> str | None:
     return when.astimezone(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def _attach_pdf(connection: sqlite3.Connection, kind: str, record_id: int) -> dict[str, Any] | None:
+    """Make the PDF the patient receives for a discharge summary or prescription. The file is kept with the message, so
+    what was sent stays on record even if the source is revised later. None (send as text) if it cannot be made."""
+    from . import pdfs
+    try:
+        data, filename = (pdfs.discharge_pdf if kind == "discharge" else pdfs.prescription_pdf)(connection, record_id)
+        path = pdfs.save(data, (MEDIA_DIR or Path("uploads") / "whatsapp") / "documents", f"{kind}-{record_id}-{uuid.uuid4().hex[:8]}")
+    except Exception:  # noqa: BLE001 - a broken PDF must not stop the message itself
+        return None
+    return {"pdf_path": str(path), "filename": filename, "content_type": "application/pdf", "template": "document"}
+
+
 def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> dict[str, Any]:
     kind = payload.get("kind")
     if kind not in ("plan", "prescription", "discharge", "reminder", "document", "message"):
@@ -395,6 +407,11 @@ def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> di
                     "\n\nTake them as advised and reply here if you have questions.")
             params = [name, doctor, _one_line(_medicines_text(meds) + (f"; Advice: {rx['advice']}" if rx.get("advice") else ""))]
             related_type, related_id = "prescription", rx["id"]
+            meta = _attach_pdf(connection, "prescription", rx["id"])
+            if meta:  # sent as a PDF document; the medicines stay in the caption
+                body = (f"Hello {name}, here is your prescription from {doctor} ({_fmt_day(rx['rx_date'])}), attached as a PDF.\n\n"
+                        f"{_medicines_text(meds)}{advice}\n\nTake them as advised and reply here if you have questions.")
+                params = [name, clinic(), f"Prescription from {doctor} ({_fmt_day(rx['rx_date'])})"]
         elif kind == "prescription":
             summary = _final_summary(connection, patient_id, payload.get("summary_id"))
             content = json.loads(summary["content_json"])
@@ -415,6 +432,10 @@ def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> di
                     f"or ask us for a printed copy.{follow}")
             params = [name, title, clinic(), portal_url()]
             related_type, related_id = "discharge_summary", summary["id"]
+            meta = _attach_pdf(connection, "discharge", summary["id"])
+            if meta:
+                body = f"Hello {name}, your {title} from {clinic()} is attached as a PDF.{follow}\n\nReply here if you have questions about it."
+                params = [name, clinic(), f"{content.get('title') or 'Discharge summary'} ({_fmt_day((summary['finalised_at'] or '')[:10])})"]
         elif kind == "reminder":
             visit = payload.get("visit_date")
             try:
@@ -459,7 +480,7 @@ def compose(db: str, patient_id: int, payload: dict[str, Any], actor: str) -> di
             if not text:
                 raise ApiError(422, "Write the message", {"fields": ["text"]})
             body = text[:3500]
-        message_id = _store(connection, patient_id, "out", kind, body, "draft", template_name=TEMPLATES.get(kind, {}).get("name"),
+        message_id = _store(connection, patient_id, "out", kind, body, "draft", template_name=TEMPLATES.get((meta or {}).get("template") or kind, {}).get("name"),
                             template_params_json=json.dumps(params) if params else None, related_type=related_type, related_id=related_id,
                             scheduled_for=scheduled, meta_json=json.dumps(meta) if meta else None)
         if kind == "reminder":  # the buttons carry this reminder's id so the patient's answer books the right visit
@@ -565,6 +586,11 @@ def _live_plan(connection: sqlite3.Connection, msg: dict[str, Any], patient: dic
             raise RuntimeError("The document file is missing")
         document = {"filename": doc["filename"]}  # "id" is added once the file is uploaded to WhatsApp
         doc_file = (Path(doc["stored_path"]), doc["content_type"] or "application/pdf")
+    elif meta.get("pdf_path"):  # discharge summary / prescription made into a PDF when the message was composed
+        if not Path(meta["pdf_path"]).exists():
+            raise RuntimeError("The PDF for this message is missing; compose it again")
+        document = {"filename": meta.get("filename") or "document.pdf"}
+        doc_file = (Path(meta["pdf_path"]), "application/pdf")
     if window_open(connection, patient["id"]):
         if document:
             document["caption"] = msg["body"][:1024]
@@ -576,7 +602,7 @@ def _live_plan(connection: sqlite3.Connection, msg: dict[str, Any], patient: dic
         else:
             body = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"body": msg["body"][:4096], "preview_url": True}}
     else:
-        template = TEMPLATES.get(msg["kind"])
+        template = TEMPLATES.get(meta.get("template") or msg["kind"])
         if not template or not msg["template_params_json"]:
             raise RuntimeError("More than 24 hours since the patient's last message; this message type has no approved template")
         if document and not str(meta.get("content_type") or "").endswith("pdf"):
@@ -804,6 +830,8 @@ def _message(connection: sqlite3.Connection, message_id: int) -> dict[str, Any]:
                                                     "voice": "Voice note", "command": "Patient command"}.get(msg["kind"], msg["kind"]))
     msg["template_params"] = json.loads(msg.pop("template_params_json") or "null")
     msg["meta"] = json.loads(msg.pop("meta_json") or "null")
+    if isinstance(msg["meta"], dict):
+        msg["meta"].pop("pdf_path", None)
     msg["buttons"] = json.loads(msg.pop("buttons_json") or "null")
     msg["has_audio"] = bool(msg["media_path"])
     msg.pop("media_path", None)
