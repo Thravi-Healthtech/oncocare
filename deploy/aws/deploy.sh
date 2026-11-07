@@ -40,6 +40,10 @@ if ! aws ssm get-parameter --name /oncocare/demo_password >/dev/null 2>&1; then
   PW="onco-$(openssl rand -hex 6)"
   aws ssm put-parameter --name /oncocare/demo_password --type SecureString --value "$PW" >/dev/null
 fi
+if ! aws ssm get-parameter --name /oncocare/staff_password >/dev/null 2>&1; then
+  say "Generating the clinician sign-in password"
+  aws ssm put-parameter --name /oncocare/staff_password --type SecureString --value "staff-$(openssl rand -hex 6)" >/dev/null
+fi
 if ! aws ssm get-parameter --name /oncocare/anthropic_api_key >/dev/null 2>&1 && [ -f .env ]; then
   KEY=$(sed -n 's/^ANTHROPIC_API_KEY=//p' .env | tail -1 | tr -d '"'"'"' ')
   if [ -n "$KEY" ]; then
@@ -163,5 +167,6 @@ done
 echo
 echo "   Patient portal password:"
 echo "     $(aws ssm get-parameter --name /oncocare/demo_password --with-decryption --query Parameter.Value --output text)"
-echo "   Clinician sign-in: radiodoc / chemodoc / surgerydoc / staff, password qwertyui"
+echo "   Clinician sign-in: radiodoc / chemodoc / surgerydoc / staff, password:"
+echo "     $(aws ssm get-parameter --name /oncocare/staff_password --with-decryption --query Parameter.Value --output text)"
 echo "   Server shell (needs session-manager-plugin): aws ssm start-session --region $REGION --target $INSTANCE"

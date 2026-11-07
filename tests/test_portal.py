@@ -239,7 +239,7 @@ class DoctorAuthTests(unittest.TestCase):
         self.assertEqual(self.call(doctor, "GET", "/api/lab-documents/1/file")[0], 401)
         self.assertEqual(self.call(doctor, "GET", "/api/auth/me")[0], 401)
         self.assertEqual(self.call(doctor, "POST", "/api/auth/login", {"username": "chemodoc", "password": "1234"})[0], 401)
-        self.assertEqual(self.call(doctor, "POST", "/api/auth/login", {"phone": "8008475309", "password": "qwertyui"})[0], 401)  # no phone sign-in
+        self.assertEqual(self.call(doctor, "POST", "/api/auth/login", {"phone": "9000000200", "password": "qwertyui"})[0], 401)  # no phone sign-in
         for username, name, role in [("radiodoc", "Dr. P. Rao", "doctor"), ("surgerydoc", "Dr. A. Menon", "doctor"), ("staff", "Hospital staff", "staff")]:
             other = build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()))
             status, me, _ = self.call(other, "POST", "/api/auth/login", {"username": username, "password": "qwertyui"})

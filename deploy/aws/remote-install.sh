@@ -37,6 +37,7 @@ KEY=$($AWS ssm get-parameter --region "$REGION" --name /oncocare/anthropic_api_k
 # Optional settings: written to the env file only when the SSM parameter exists (missing ones keep the app defaults,
 # e.g. WhatsApp stays in simulator mode until /oncocare/whatsapp/mode is "live").
 OPTIONAL_PARAMS="
+/oncocare/staff_password:ONCOCARE_STAFF_PASSWORD
 /oncocare/sarvam_api_key:SARVAM_API_KEY
 /oncocare/whatsapp/mode:WHATSAPP_MODE
 /oncocare/whatsapp/token:WHATSAPP_TOKEN

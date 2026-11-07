@@ -590,10 +590,11 @@ ADDED_COLUMNS = {
 }
 
 # Hospital sign-in accounts: (username, display name, contact phone, specialty, role).
-# chemodoc is the original Dr. R. Khanna account (phone 8008475309); the others use the names on the demo records.
-# Each gets STAFF_DEFAULT_PASSWORD (or ONCOCARE_STAFF_PASSWORD) the first time it is created; a stored password is never reset.
+# chemodoc is the original Dr. R. Khanna account; the others use the names on the demo records.
+# Each gets ONCOCARE_STAFF_PASSWORD the first time it is created; a stored password is never reset. Locally the default is
+# STAFF_DEFAULT_PASSWORD; a public deployment (ONCOCARE_PUBLIC=1) never uses the default, so set ONCOCARE_STAFF_PASSWORD there.
 STAFF_ACCOUNTS = [
-    ("chemodoc", "Dr. R. Khanna", "8008475309", "Medical oncology", "doctor"),
+    ("chemodoc", "Dr. R. Khanna", "9000000200", "Medical oncology", "doctor"),
     ("radiodoc", "Dr. P. Rao", "9000000201", "Radiation oncology", "doctor"),
     ("surgerydoc", "Dr. A. Menon", "9000000202", "Surgical oncology", "doctor"),
     ("staff", "Hospital staff", "9000000203", "Staff", "staff"),
@@ -603,7 +604,7 @@ DEMO_PHONES = {"HN-24018": "9000000018", "HN-24031": "9000000031", "HN-24077": "
 
 
 def normalise_phone(value: object) -> str | None:
-    """Digits only; drops a leading 0 or India country code so 08008475309 / +91 80084 75309 / 8008475309 match."""
+    """Digits only; drops a leading 0 or India country code so 09876543210 / +91 98765 43210 / 9876543210 match."""
     digits = "".join(ch for ch in str(value or "") if ch.isdigit())
     if len(digits) == 12 and digits.startswith("91"):
         digits = digits[2:]
@@ -621,7 +622,9 @@ def hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
 
 
 def _seed_staff_accounts(connection: sqlite3.Connection) -> None:
-    password = os.environ.get("ONCOCARE_STAFF_PASSWORD") or STAFF_DEFAULT_PASSWORD
+    password = os.environ.get("ONCOCARE_STAFF_PASSWORD")
+    if not password and os.environ.get("ONCOCARE_PUBLIC", "").lower() not in {"1", "true", "yes"}:
+        password = STAFF_DEFAULT_PASSWORD
     for username, name, phone, specialty, role in STAFF_ACCOUNTS:
         row = connection.execute("SELECT id FROM clinicians WHERE username = ?", (username,)).fetchone() \
             or connection.execute("SELECT id FROM clinicians WHERE phone = ? AND username IS NULL", (phone,)).fetchone()
@@ -631,7 +634,7 @@ def _seed_staff_accounts(connection: sqlite3.Connection) -> None:
         else:
             connection.execute("""INSERT INTO clinicians (username, name, phone, specialty, role, active, created_at)
                                   VALUES (?, ?, ?, ?, ?, 1, ?)""", (username, name, phone, specialty, role, utc_now()))
-    for row in connection.execute("SELECT id FROM clinicians WHERE password_hash IS NULL").fetchall():
+    for row in connection.execute("SELECT id FROM clinicians WHERE password_hash IS NULL").fetchall() if password else []:
         digest, salt = hash_password(password)
         connection.execute("UPDATE clinicians SET password_hash = ?, password_salt = ? WHERE id = ?", (digest, salt, row["id"]))
 

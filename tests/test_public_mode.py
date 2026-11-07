@@ -85,3 +85,28 @@ class PublicModeTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PublicStaffPasswordTest(unittest.TestCase):
+    """A public deployment never gives the clinician accounts the published local default password."""
+
+    def accounts(self, env: dict) -> list:
+        from backend.database import connect, hash_password
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, env):
+            os.environ.pop("ONCOCARE_STAFF_PASSWORD", None)  # restored when the patch ends
+            path = str(Path(tmp) / "staff.db")
+            migrate(path)
+            connection = connect(path)
+            try:
+                rows = connection.execute("SELECT username, password_hash, password_salt FROM clinicians WHERE username IS NOT NULL").fetchall()
+            finally:
+                connection.close()
+            return [(r["username"], r["password_hash"] and hash_password("qwertyui", r["password_salt"])[0] == r["password_hash"]) for r in rows]
+
+    def test_public_mode_without_password_leaves_accounts_unusable(self) -> None:
+        rows = self.accounts({"ONCOCARE_PUBLIC": "1"})
+        self.assertEqual(len(rows), 4)
+        self.assertTrue(all(not uses_default for _, uses_default in rows))
+
+    def test_local_default_still_works(self) -> None:
+        self.assertTrue(all(uses_default for _, uses_default in self.accounts({"ONCOCARE_PUBLIC": ""})))
